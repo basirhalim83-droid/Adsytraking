@@ -16,6 +16,20 @@ const PROBLEM_STAGES = ['BERMASALAH', 'RETUR'];
 const ROWS_PER_RUN = 300;
 const BATCH = 5;
 
+// Order yang udah lebih tua dari ini TAPI masih belum SAMPAI/RETUR kemungkinan besar udah
+// gak bakal update lagi (paket ilang/data usang) -- daripada di-cek cron terus-terusan
+// selama-lamanya, cron berhenti otomatis nyentuh order setua ini. Datanya TETAP kesimpen &
+// tetap bisa dibuka penuh di halaman Tracking (geser date-range picker), cuma gak lagi
+// keiket jadwal cron -- kalau butuh cek ulang satu order tua, tetep bisa manual lewat
+// tombol "Cek Ulang" di modal detail.
+const STALE_CUTOFF_DAYS = 60;
+
+function cutoffDateYMD() {
+  const d = new Date();
+  d.setDate(d.getDate() - STALE_CUTOFF_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
 // Notif WA (ditunda -- lihat plan step 7): target sementara 1 nomor ops via env var
 // OPS_WA_NUMBER. sendFonnteWA() sendiri no-op kalau FONNTE_TOKEN belum di-set, jadi aman
 // dibiarkan wired di sini walau belum diaktifkan user.
@@ -30,6 +44,7 @@ module.exports = async function handler(req, res) {
   }
 
   const ekspedisiFilter = AUTO_EKSPEDISI_LIST.map(e => encodeURIComponent(e)).join(',');
+  const cutoff = cutoffDateYMD();
   let checked = 0, updated = 0, failed = 0, notified = 0;
   const errors = [];
 
@@ -37,7 +52,7 @@ module.exports = async function handler(req, res) {
     let rows;
     try {
       rows = await sbFetch(
-        `${table}?select=id,ekspedisi,kota_tujuan,status_resi,produk&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order=id&limit=${ROWS_PER_RUN}`
+        `${table}?select=id,ekspedisi,kota_tujuan,status_resi,produk&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${ROWS_PER_RUN}`
       );
     } catch (e) {
       errors.push(`${table}: gagal fetch (${e.message})`);
@@ -78,5 +93,5 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  res.status(200).json({ checked, updated, failed, notified, errors: errors.slice(0, 20) });
+  res.status(200).json({ checked, updated, failed, notified, staleCutoff: cutoff, errors: errors.slice(0, 20) });
 };
