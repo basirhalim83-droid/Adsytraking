@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kelola Toko — adsy-tracking</title>
+<link rel="stylesheet" href="css/main.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="sidebar-slot"></div>
+<div id="header-slot"></div>
+<div class="main-content">
+  <div class="page" id="pageContent"></div>
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script>
+const MP_TABS = [
+  { key: 'shopee', label: 'Shopee' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'lazada', label: 'Lazada' },
+];
+let stActiveMp = 'shopee';
+
+(async () => {
+  await initSupabaseClient();
+  const user = await requireAuth();
+  if (!user) return;
+  renderLayout('settings-toko', user);
+  renderStoresPage();
+})();
+
+function renderStoresPage() {
+  document.getElementById('pageContent').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <h3>Kelola Toko</h3>
+          <div class="card-sub">Daftar toko per marketplace -- dipakai buat dropdown pas upload & filter di Tracking Marketplace</div>
+        </div>
+      </div>
+      <div class="tr-tabs" id="stTabs"></div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;max-width:420px">
+        <input type="text" id="stNewName" class="ctrl-input" style="flex:1" placeholder="Nama toko baru...">
+        <button class="btn btn-primary btn-sm" onclick="addStore()">+ Tambah</button>
+      </div>
+      <div id="stError" style="display:none;color:var(--danger);font-size:.82rem;margin-bottom:12px"></div>
+      <div id="stList"></div>
+    </div>
+  `;
+  renderStTabs();
+  loadStores();
+}
+
+function renderStTabs() {
+  document.getElementById('stTabs').innerHTML = MP_TABS.map(t =>
+    `<div class="tr-tab ${stActiveMp === t.key ? 'active' : ''}" onclick="setStTab('${t.key}')">${t.label}</div>`
+  ).join('');
+}
+
+function setStTab(mp) { stActiveMp = mp; renderStTabs(); loadStores(); }
+
+async function loadStores() {
+  const el = document.getElementById('stList');
+  el.innerHTML = `<div class="page-loading"><div class="spinner"></div></div>`;
+  try {
+    const stores = await dbGetStores(stActiveMp);
+    if (!stores.length) {
+      el.innerHTML = `<div class="empty"><div class="icon">🏬</div>Belum ada toko terdaftar di ${MP_TABS.find(t=>t.key===stActiveMp).label}.</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nama Toko</th><th>Ditambahkan</th><th></th></tr></thead>
+          <tbody>
+            ${stores.map(s => `
+              <tr>
+                <td style="font-weight:600">${escapeHtml(s.name)}</td>
+                <td style="font-size:.78rem;color:var(--text-3)">${new Date(s.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
+                <td><button class="btn btn-sm" style="background:#FEE2E2;color:#EF233C;border:none;cursor:pointer" onclick="removeStore('${s.id}','${escapeHtml(s.name)}')">Hapus</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--danger);padding:20px">Gagal memuat: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function addStore() {
+  const input = document.getElementById('stNewName');
+  const errEl = document.getElementById('stError');
+  const name = input.value.trim();
+  errEl.style.display = 'none';
+  if (!name) return;
+  try {
+    await dbAddStore(stActiveMp, name);
+    input.value = '';
+    showToast('✅ Toko ditambahkan', 'success');
+    loadStores();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+async function removeStore(id, name) {
+  if (!confirm(`Hapus toko "${name}"? Order yang sudah ada tetap tersimpan, cuma gak muncul lagi di dropdown/filter.`)) return;
+  try {
+    await dbDeleteStore(id);
+    showToast('✅ Toko dihapus', 'success');
+    loadStores();
+  } catch (e) {
+    showToast('❌ Gagal hapus: ' + e.message, 'error');
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement?.id === 'stNewName') addStore();
+});
+</script>
+</body>
+</html>
