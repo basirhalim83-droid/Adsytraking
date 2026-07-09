@@ -446,12 +446,6 @@ function initTrackingPage(cfg) {
   window.trReload = load; // dipanggil upload-common.js abis upload sukses, biar list ke-refresh
 
   load();
-
-  // Auto-buka modal upload kalau dinavigasi dari sidebar "Upload X" (lihat handleUploadNavClick di js/app.js)
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('upload') === '1' && typeof openUploadModal === 'function') {
-    setTimeout(() => openUploadModal(cfg.domain), 0);
-  }
 }
 
 function ensureModal() {
