@@ -71,7 +71,7 @@ function renderLayout(activePage, user) {
   document.getElementById('sidebar-slot').innerHTML = `
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-logo">
-        <div class="logo-icon">📦</div>
+        <img src="img/logo-adsy.png" style="height:34px;width:34px;object-fit:contain;flex-shrink:0">
         <div>
           <div class="logo-text">adsy-tracking</div>
           <div style="font-size:.66rem;color:var(--text-3);font-weight:600">Tracking Resi Terpadu</div>
