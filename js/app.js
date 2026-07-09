@@ -18,19 +18,19 @@ const NAV_GROUPS = [
   {
     label: 'AKUISISI',
     items: [
-      { id: 'tracking-akuisisi', label: 'Tracking Resi', icon: ICON_TRACKING, file: 'tracking-akuisisi.html', type: 'page' },
+      { id: 'tracking-akuisisi', label: 'Tracking Akuisisi', icon: ICON_TRACKING, file: 'tracking-akuisisi.html', type: 'page' },
     ],
   },
   {
     label: 'MARKETPLACE',
     items: [
-      { id: 'tracking-marketplace', label: 'Tracking Resi', icon: ICON_TRACKING, file: 'tracking-marketplace.html', type: 'page' },
+      { id: 'tracking-marketplace', label: 'Tracking Marketplace', icon: ICON_TRACKING, file: 'tracking-marketplace.html', type: 'page' },
     ],
   },
   {
     label: 'CRM',
     items: [
-      { id: 'tracking-crm', label: 'Tracking Resi', icon: ICON_TRACKING, file: 'tracking-crm.html', type: 'page' },
+      { id: 'tracking-crm', label: 'Tracking CRM', icon: ICON_TRACKING, file: 'tracking-crm.html', type: 'page' },
     ],
   },
   {
