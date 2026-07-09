@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/cron-check-resi.js": {
+      "maxDuration": 60
+    }
+  }
+}
