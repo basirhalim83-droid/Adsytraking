@@ -93,8 +93,6 @@ body {
 }
 .nav-item:hover { background: rgba(67,97,238,.08); color: var(--primary); }
 .nav-item.active { background: var(--primary); color: #fff; font-weight: 600; }
-.nav-item.nav-upload { color: var(--text-3); font-size: .8rem; }
-.nav-item.nav-upload:hover { color: var(--primary); }
 .nav-icon { width: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .nav-icon svg { width: 17px; height: 17px; }
 
