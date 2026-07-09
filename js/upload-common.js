@@ -6,10 +6,10 @@
 const DOMAIN_TABLE = { akuisisi: 'akuisisi_orders', marketplace: 'marketplace_orders', crm: 'crm_orders' };
 const DOMAIN_LABEL = { akuisisi: 'Akuisisi', marketplace: 'Marketplace', crm: 'CRM' };
 
-let _upState = { step: 1, domain: null, detectedMp: null, parsedRows: [], storeName: '' };
+let _upState = { step: 1, domain: null, detectedMp: null, parsedRows: [], storeName: '', storeOptions: [] };
 
 function openUploadModal(domain) {
-  _upState = { step: 1, domain, detectedMp: null, parsedRows: [], storeName: '' };
+  _upState = { step: 1, domain, detectedMp: null, parsedRows: [], storeName: '', storeOptions: [] };
   ensureUploadModal();
   renderUploadModal();
   document.getElementById('uploadModalOverlay').classList.add('open');
@@ -63,11 +63,18 @@ function renderUploadModal() {
         <div><div style="font-weight:700;font-size:.85rem">${mpTag}${_upState.parsedRows.length} baris data siap diimport</div></div>
       </div>`;
       if (domain === 'marketplace') {
+        const isNew = _upState.storeName === '__new__';
         info += `<div style="margin-top:12px">
           <label style="font-size:.82rem;font-weight:700;color:var(--text-2);display:block;margin-bottom:6px">Nama Toko *</label>
-          <input type="text" id="storeNameInput" placeholder="Contoh: Adsy Official"
-            style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:.875rem;box-sizing:border-box"
-            value="${_upState.storeName || ''}">
+          <select id="storeNameSelect" class="ctrl-select" style="width:100%" onchange="onStoreSelectChange(this.value)">
+            <option value="">-- Pilih Toko --</option>
+            ${_upState.storeOptions.map(s => `<option value="${escapeHtml(s.name)}" ${_upState.storeName === s.name ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+            <option value="__new__" ${isNew ? 'selected' : ''}>+ Tambah toko baru...</option>
+          </select>
+          <div id="newStoreWrap" style="display:${isNew ? 'block' : 'none'};margin-top:8px">
+            <input type="text" id="newStoreNameInput" class="ctrl-input" style="width:100%" placeholder="Nama toko baru, mis. Adsy Official">
+          </div>
+          <div style="font-size:.72rem;color:var(--text-3);margin-top:4px">Belum ada di daftar? Kelola lewat menu "Kelola Toko" atau tambah langsung di sini.</div>
         </div>`;
       }
     }
@@ -145,7 +152,7 @@ function handleUploadFile(file) {
     return;
   }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const wb = XLSX.read(e.target.result, { type: 'binary' });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -171,6 +178,7 @@ function handleUploadFile(file) {
         for (const [field, fn] of Object.entries(cfg.map)) mapping[field] = fn(headers);
         _upState.detectedMp = mp;
         _upState.parsedRows = _parseMarketplaceRows(rows, mp, mapping);
+        _upState.storeOptions = await dbGetStores(mp);
       } else {
         const cfg = domain === 'akuisisi' ? AKUISISI_CONFIG : CRM_CONFIG;
         const { headers, rows } = _readSheet(ws, false);
@@ -191,12 +199,36 @@ function handleUploadFile(file) {
   reader.readAsBinaryString(file);
 }
 
-function goToUploadPreview() {
+function onStoreSelectChange(val) {
+  _upState.storeName = val;
+  const wrap = document.getElementById('newStoreWrap');
+  if (val === '__new__') { wrap.style.display = 'block'; document.getElementById('newStoreNameInput').focus(); }
+  else { wrap.style.display = 'none'; }
+}
+
+async function goToUploadPreview() {
   if (_upState.domain === 'marketplace') {
-    _upState.storeName = document.getElementById('storeNameInput')?.value.trim() || '';
+    const btn = document.getElementById('btnUploadNext');
+    if (_upState.storeName === '__new__') {
+      const newName = document.getElementById('newStoreNameInput')?.value.trim() || '';
+      if (!newName) {
+        document.getElementById('newStoreNameInput').style.borderColor = 'var(--danger)';
+        document.getElementById('newStoreNameInput').focus();
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan toko...'; }
+      try {
+        await dbAddStore(_upState.detectedMp, newName);
+        _upState.storeName = newName;
+      } catch (e) {
+        // Toko udah ada duluan (race dgn upload lain) -- gapapa, tetep pakai nama itu.
+        _upState.storeName = newName;
+      }
+      if (btn) { btn.disabled = false; btn.textContent = 'Preview →'; }
+    }
     if (!_upState.storeName) {
-      document.getElementById('storeNameInput').style.borderColor = 'var(--danger)';
-      document.getElementById('storeNameInput').focus();
+      document.getElementById('storeNameSelect').style.borderColor = 'var(--danger)';
+      document.getElementById('storeNameSelect').focus();
       return;
     }
   }

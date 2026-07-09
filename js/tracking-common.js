@@ -114,6 +114,8 @@ function initTrackingPage(cfg) {
     filterStage: 'SEMUA',
     modalId: null,
     mpFilter: '',
+    storeFilter: '',
+    storeOptions: [],
   };
   const today = new Date();
   st.filterStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -194,6 +196,9 @@ function initTrackingPage(cfg) {
       const filters = { dateFrom: trYmd(st.filterStart), dateTo: trYmd(st.filterEnd) };
       if (cfg.hasMarketplaceFilter && st.mpFilter) filters.marketplace = st.mpFilter;
       st.orders = await dbGetTrackableOrders(cfg.table, filters);
+      if (cfg.hasMarketplaceFilter && typeof dbGetStores === 'function') {
+        st.storeOptions = await dbGetStores(st.mpFilter || undefined);
+      }
       renderPage();
     } catch (e) {
       showError('Gagal memuat data tracking: ' + e.message);
@@ -229,6 +234,10 @@ function initTrackingPage(cfg) {
                 <option value="shopee" ${st.mpFilter==='shopee'?'selected':''}>Shopee</option>
                 <option value="tiktok" ${st.mpFilter==='tiktok'?'selected':''}>TikTok</option>
                 <option value="lazada" ${st.mpFilter==='lazada'?'selected':''}>Lazada</option>
+              </select>
+              <select class="ctrl-select" id="trStoreFilter" onchange="trSetStoreFilter(this.value)">
+                <option value="">Semua Toko</option>
+                ${st.storeOptions.map(s => `<option value="${escapeHtml(s.name)}" ${st.storeFilter===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
               </select>` : ''}
             <div class="drp-wrap">
               <button class="drp-trigger" onclick="trDrpToggle()" id="trDrp-trigger">
@@ -298,7 +307,8 @@ function initTrackingPage(cfg) {
   }
 
   window.trSetFilter = (key) => { st.filterStage = key; renderTabs(); applyFilter(); };
-  window.trSetMpFilter = (val) => { st.mpFilter = val; load(); };
+  window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; load(); };
+  window.trSetStoreFilter = (val) => { st.storeFilter = val; applyFilter(); };
 
   function applyFilter() {
     const q = (document.getElementById('trSearch').value || '').toLowerCase();
@@ -306,6 +316,7 @@ function initTrackingPage(cfg) {
       const stage = trEffectiveStage(o);
       if (st.filterStage === 'ON_PROSES_GROUP') { if (!TR_ON_PROSES_STAGES.includes(stage)) return false; }
       else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
+      if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return true;
     });
