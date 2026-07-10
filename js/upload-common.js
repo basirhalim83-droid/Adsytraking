@@ -266,14 +266,20 @@ async function applyUploadData() {
     if (result.saved === 0) {
       await dbDeleteUploadBatchRow(batchId);
       closeUploadModal();
-      showToast(`ℹ️ Semua ${result.skipped} data sudah ada, tidak ada yang ditambahkan.`, 'info');
+      const reasons = [];
+      if (result.duplicateInBatch > 0) reasons.push(`${result.duplicateInBatch} duplikat dalam file`);
+      if (result.skipped > 0) reasons.push(`${result.skipped} sudah ada di database`);
+      showToast(`ℹ️ Tidak ada yang ditambahkan (${reasons.join(', ') || 'semua sudah ada'}).`, 'info');
       return;
     }
 
     await dbUpdateUploadBatchCount(batchId, result.saved);
     closeUploadModal();
     let msg = `✅ ${result.saved} data berhasil disimpan!`;
-    if (result.skipped > 0) msg += ` (${result.skipped} dilewati, sudah ada)`;
+    const reasons = [];
+    if (result.duplicateInBatch > 0) reasons.push(`${result.duplicateInBatch} duplikat dalam file`);
+    if (result.skipped > 0) reasons.push(`${result.skipped} sudah ada di database`);
+    if (reasons.length) msg += ` (dilewati: ${reasons.join(', ')})`;
     showToast(msg, 'success');
     if (typeof trReload === 'function') trReload();
   } catch (e) {

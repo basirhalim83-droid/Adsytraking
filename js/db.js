@@ -88,6 +88,10 @@ async function dbBulkInsertOrders(table, rows, batchId, uploaderId) {
   const seen = new Map();
   inserts.forEach(r => seen.set(r.id, r));
   const unique = Array.from(seen.values());
+  // Duplikat DALAM FILE ITU SENDIRI (resi sama muncul >1x) -- sebelumnya di-dedup diam-diam di
+  // sini tanpa pernah dilaporin ke user, jadi kalau upload 155 baris taunya cuma 153 tersimpan
+  // tanpa penjelasan. Sekarang dihitung terpisah dari "skipped" (yang emang udah ada di database).
+  const duplicateInBatch = inserts.length - unique.length;
 
   const allIds = unique.map(r => r.id);
   const existingIds = new Set();
@@ -108,7 +112,7 @@ async function dbBulkInsertOrders(table, rows, batchId, uploaderId) {
     if (error) throw error;
   }
 
-  return { saved: newRows.length, skipped };
+  return { saved: newRows.length, skipped, duplicateInBatch };
 }
 
 async function dbInsertUploadBatch(batch) {
