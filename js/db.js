@@ -55,14 +55,27 @@ async function dbGetProfile(userId) {
 // ── Tracking orders (generik, dipakai ketiga domain: akuisisi/marketplace/crm) ─
 // Satu implementasi buat 3 tabel -- kontrak kolom tracking-nya seragam (lihat sql/001_init.sql),
 // jadi gak perlu fan-out query kayak MarketDash lama yang punya 3 tabel per-marketplace.
+// Di-page pake .range() 1000 per batch -- PostgREST default max-rows 1000, tanpa ini query
+// diam-diam kepotong pas order-nya lebih dari 1000 (ketauan dari Tracking Akuisisi yang macet
+// pas "Total: 1000" padahal resi aslinya lebih banyak).
 async function dbGetTrackableOrders(table, filters = {}) {
-  let q = _sb.from(table).select('*').order('order_date', { ascending: false });
-  if (filters.dateFrom) q = q.gte('order_date', filters.dateFrom);
-  if (filters.dateTo)   q = q.lte('order_date', filters.dateTo);
-  if (filters.marketplace) q = q.eq('marketplace', filters.marketplace);
-  const { data, error } = await q;
-  if (error) throw error;
-  return data || [];
+  const PAGE = 1000;
+  let all = [];
+  let page = 0;
+  let hasMore = true;
+  while (hasMore) {
+    let q = _sb.from(table).select('*').order('order_date', { ascending: false });
+    if (filters.dateFrom) q = q.gte('order_date', filters.dateFrom);
+    if (filters.dateTo)   q = q.lte('order_date', filters.dateTo);
+    if (filters.marketplace) q = q.eq('marketplace', filters.marketplace);
+    q = q.range(page * PAGE, (page + 1) * PAGE - 1);
+    const { data, error } = await q;
+    if (error) throw error;
+    all = all.concat(data || []);
+    hasMore = (data || []).length === PAGE;
+    page++;
+  }
+  return all;
 }
 
 // ── Upload batches ────────────────────────────────────────────────────────────
@@ -145,5 +158,28 @@ async function dbAddStore(marketplace, name) {
 
 async function dbDeleteStore(id) {
   const { error } = await _sb.from('stores').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Tim/CS (per domain akuisisi/crm) -- target notif WA pas order bermasalah ───
+async function dbGetTeamMembers(domain) {
+  let q = _sb.from('team_members').select('*').order('name');
+  if (domain) q = q.eq('domain', domain);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+async function dbAddTeamMember(domain, name, noWa) {
+  const { data, error } = await _sb.from('team_members').insert({ domain, name, no_wa: noWa }).select().single();
+  if (error) {
+    if (error.code === '23505') throw new Error('Nama itu sudah terdaftar di domain ini.');
+    throw error;
+  }
+  return data;
+}
+
+async function dbDeleteTeamMember(id) {
+  const { error } = await _sb.from('team_members').delete().eq('id', id);
   if (error) throw error;
 }
