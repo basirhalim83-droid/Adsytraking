@@ -180,11 +180,24 @@ function _makeSimpleOrderConfig(domainLabel) {
       total: h => _findCol(h, ['total pembayaran', 'total', 'harga', 'nominal']),
       pembayaran: h => _findCol(h, ['pembayaran', 'metode pembayaran']),
       ekspedisi: h => _findCol(h, ['ekspedisi', 'kurir', 'expedisi']),
+      instruksi: h => _findCol(h, ['instruksi pengiriman', 'instruksi']),
     },
   };
 }
 const AKUISISI_CONFIG = _makeSimpleOrderConfig('Akuisisi');
 const CRM_CONFIG = _makeSimpleOrderConfig('CRM');
+
+// Format baku: "Pengirim CS <nama CS> / Adv. <nama ADV> / <nama ADM>" (pola sama
+// kayak ValidasiOrder-main/app.html) -- kita cuma butuh nama CS-nya (segmen pertama),
+// dipakai buat rute notif WA ke CS yang pegang order itu (lihat team_members).
+function extractCsName(instruksi) {
+  const parts = String(instruksi || '').split('/');
+  return (parts[0] || '')
+    .replace(/^Pengirim\s+CS\s+/i, '')
+    .replace(/^Pengirim\s+/i, '')
+    .replace(/^CS\s+/i, '')
+    .trim();
+}
 
 function _parseSimpleOrderRows(rows, mapping, domain) {
   return rows.map((row, i) => {
@@ -202,6 +215,7 @@ function _parseSimpleOrderRows(rows, mapping, domain) {
       qty: _safeParseInt(get(mapping.qty)) || 1,
       total: _parsePrice(get(mapping.total)),
       ekspedisi: _normalizeEkspedisi(ekspedisiRaw),
+      cs_nama: extractCsName(get(mapping.instruksi)),
     };
   }).filter(r => r.id && r.id.trim());
 }

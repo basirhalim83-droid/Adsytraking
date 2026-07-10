@@ -37,6 +37,7 @@ const NAV_GROUPS = [
     label: 'PENGATURAN',
     items: [
       { id: 'settings-toko', label: 'Kelola Toko', icon: ICON_SETTINGS, file: 'settings-toko.html', type: 'page' },
+      { id: 'settings-tim', label: 'Kelola Tim', icon: ICON_SETTINGS, file: 'settings-tim.html', type: 'page' },
     ],
   },
 ];

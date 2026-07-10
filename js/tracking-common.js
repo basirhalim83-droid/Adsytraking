@@ -348,6 +348,7 @@ function initTrackingPage(cfg) {
               <span class="badge ${meta.badge}">${meta.label}</span>
               ${mpBadge}
               ${o.ekspedisi ? `<span class="badge badge-gray">${escapeHtml(o.ekspedisi)}</span>` : ''}
+              ${o.cs_nama ? `<span class="badge badge-primary">👤 ${escapeHtml(o.cs_nama)}</span>` : ''}
             </div>
             <div class="tr-produk" title="${escapeHtml(o.produk || '-')}">${escapeHtml(o.produk || '-')} × ${o.qty || 1}</div>
           </div>

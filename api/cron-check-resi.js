@@ -30,10 +30,46 @@ function cutoffDateYMD() {
   return d.toISOString().slice(0, 10);
 }
 
-// Notif WA (ditunda -- lihat plan step 7): target sementara 1 nomor ops via env var
-// OPS_WA_NUMBER. sendFonnteWA() sendiri no-op kalau FONNTE_TOKEN belum di-set, jadi aman
-// dibiarkan wired di sini walau belum diaktifkan user.
+// Notif WA (ditunda -- lihat plan step 7): sendFonnteWA() sendiri no-op kalau FONNTE_TOKEN
+// belum di-set, jadi aman dibiarkan wired di sini walau belum diaktifkan user.
+// Rute target: akuisisi_orders/crm_orders -> cari WA CS yang namanya cocok (cs_nama, hasil
+// parsing kolom Instruksi Pengiriman pas upload) di tabel team_members; kalau gak ketemu
+// (atau buat marketplace_orders yang emang gak punya konsep "CS pribadi") fallback ke 1
+// nomor ops via env var OPS_WA_NUMBER.
 const OPS_WA_NUMBER = process.env.OPS_WA_NUMBER;
+
+const TABLE_DOMAIN = { akuisisi_orders: 'akuisisi', marketplace_orders: 'marketplace', crm_orders: 'crm' };
+const TABLE_SELECT = {
+  akuisisi_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk,cs_nama',
+  marketplace_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk',
+  crm_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk,cs_nama',
+};
+
+function normalizeName(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
+async function loadTeamLookup() {
+  // { akuisisi: { 'nama cs (lowercase)': no_wa }, crm: { ... } }
+  const lookup = { akuisisi: {}, crm: {} };
+  try {
+    const members = await sbFetch('team_members?select=domain,name,no_wa');
+    (members || []).forEach(m => {
+      if (!lookup[m.domain]) lookup[m.domain] = {};
+      lookup[m.domain][normalizeName(m.name)] = m.no_wa;
+    });
+  } catch (e) {
+    // Gak fatal -- fallback ke OPS_WA_NUMBER kalau gagal (mis. tabel belum ada karena
+    // sql/004_team_members.sql belum dijalanin).
+  }
+  return lookup;
+}
+
+function resolveWaTarget(teamLookup, table, row) {
+  const domain = TABLE_DOMAIN[table];
+  const csWa = teamLookup[domain]?.[normalizeName(row.cs_nama)];
+  return csWa || OPS_WA_NUMBER;
+}
 
 module.exports = async function handler(req, res) {
   const auth = req.headers.authorization || '';
@@ -45,6 +81,7 @@ module.exports = async function handler(req, res) {
 
   const ekspedisiFilter = AUTO_EKSPEDISI_LIST.map(e => encodeURIComponent(e)).join(',');
   const cutoff = cutoffDateYMD();
+  const teamLookup = await loadTeamLookup();
   let checked = 0, updated = 0, failed = 0, notified = 0;
   const errors = [];
 
@@ -52,7 +89,7 @@ module.exports = async function handler(req, res) {
     let rows;
     try {
       rows = await sbFetch(
-        `${table}?select=id,ekspedisi,kota_tujuan,status_resi,produk&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${ROWS_PER_RUN}`
+        `${table}?select=${TABLE_SELECT[table]}&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${ROWS_PER_RUN}`
       );
     } catch (e) {
       errors.push(`${table}: gagal fetch (${e.message})`);
@@ -80,10 +117,11 @@ module.exports = async function handler(req, res) {
           // kalau statusnya emang udah bermasalah dari run sebelumnya.
           const wasProblem = PROBLEM_STAGES.includes(row.status_resi);
           const isProblem = PROBLEM_STAGES.includes(stage);
-          if (isProblem && !wasProblem && OPS_WA_NUMBER) {
+          const waTarget = isProblem && !wasProblem ? resolveWaTarget(teamLookup, table, row) : null;
+          if (waTarget) {
             const label = stage === 'RETUR' ? 'RETUR' : 'BERMASALAH';
             const msg = `⚠️ Order ${table.replace('_orders', '')} (resi ${row.id}, produk "${row.produk || '-'}") sekarang berstatus *${label}*. Cek di menu Tracking Resi ya.`;
-            try { await sendFonnteWA(OPS_WA_NUMBER, msg); notified++; } catch { /* gak fatal -- status_resi tetep keupdate */ }
+            try { await sendFonnteWA(waTarget, msg); notified++; } catch { /* gak fatal -- status_resi tetep keupdate */ }
           }
         } catch (e) {
           failed++;
