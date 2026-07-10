@@ -300,11 +300,15 @@ async function loadManageBatches(domain) {
   const body = document.getElementById('manageModalBody');
   body.innerHTML = `<div class="page-loading"><div class="spinner"></div><div>Memuat data...</div></div>`;
   try {
-    const batches = await dbGetUploadBatches(domain);
+    const [batches, me] = await Promise.all([dbGetUploadBatches(domain), getCurrentUser()]);
     if (!batches.length) {
       body.innerHTML = `<div class="page-loading"><div style="font-size:2rem">📭</div><div>Belum ada data upload</div></div>`;
       return;
     }
+    // Hapus cuma boleh buat batch sendiri, kecuali role admin/spv (permintaan user 2026-07-10).
+    // Enforce beneran-nya di RLS (sql/005_delete_permission.sql) -- ini cuma nyamain tampilan
+    // biar gak ada tombol yang bakal gagal diklik.
+    const canDeleteAll = ['admin', 'spv'].includes(me?.role);
     body.innerHTML = `
       <p style="font-size:.82rem;color:var(--text-3);margin-bottom:12px">Klik Hapus buat hapus semua data dalam satu batch upload.</p>
       <div class="table-wrap">
@@ -317,13 +321,14 @@ async function loadManageBatches(domain) {
               const tgl = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
               const jam = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
               const label = domain === 'marketplace' ? `${(b.marketplace || '-').toUpperCase()} · ${b.store_name || '-'}` : b.id;
+              const canDelete = canDeleteAll || b.uploaded_by === me?.id;
               return `<tr>
                 <td style="font-weight:600;font-size:.82rem">${escapeHtml(label)}</td>
                 <td style="font-size:.8rem;color:var(--text-3)">${escapeHtml((p.name || '-').split(' ')[0])}</td>
                 <td style="font-size:.78rem;color:var(--text-3)">${tgl}<br>${jam}</td>
                 <td style="font-weight:700;text-align:center">${b.record_count}</td>
-                <td><button class="btn btn-sm" style="background:#FEE2E2;color:#EF233C;border:none;cursor:pointer;border-radius:8px;padding:5px 12px;font-weight:700;font-size:.78rem"
-                  onclick="confirmDeleteBatch('${domain}','${b.id}',${b.record_count})">Hapus</button></td>
+                <td>${canDelete ? `<button class="btn btn-sm" style="background:#FEE2E2;color:#EF233C;border:none;cursor:pointer;border-radius:8px;padding:5px 12px;font-weight:700;font-size:.78rem"
+                  onclick="confirmDeleteBatch('${domain}','${b.id}',${b.record_count})">Hapus</button>` : `<span style="font-size:.72rem;color:var(--text-3)">-</span>`}</td>
               </tr>`;
             }).join('')}
           </tbody>
