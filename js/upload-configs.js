@@ -14,11 +14,16 @@ function _findCol(headers, keywords) {
   return headers.find(h => keywords.some(k => norm(h).includes(k.replace(/\s+/g, '')))) || null;
 }
 
-// Excel kadang nyimpen HP/resi angka panjang jadi notasi ilmiah ("6.28E+11").
+// Excel kadang nyimpen HP/resi angka panjang jadi notasi ilmiah ("6.28E+11"), atau nyimpen
+// sebagai teks pake tanda kutip depan biar gak keubah notasi ilmiah ("'1468282600493727") --
+// dua-duanya harus dibersihin, ketauan dari resi asli yang kesimpen jadi "'1468282600493727"
+// (bukan angka aslinya) sehingga gagal ditracking ke API kurir.
 function _fixSciNotation(val) {
   if (typeof val === 'number') return Math.round(val).toString();
-  if (typeof val === 'string' && /\d+\.\d+E[+\-]\d+/i.test(val)) return Math.round(parseFloat(val)).toString();
-  return String(val ?? '').trim();
+  let s = String(val ?? '').trim();
+  if (s.startsWith("'")) s = s.slice(1).trim();
+  if (/^\d+\.\d+E[+\-]\d+$/i.test(s)) return Math.round(parseFloat(s)).toString();
+  return s;
 }
 
 function _safeParseInt(v) {
