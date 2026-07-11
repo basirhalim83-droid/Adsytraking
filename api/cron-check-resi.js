@@ -2,9 +2,16 @@
 // plan cuma dukung cron native 1x/hari. Auth via header "Authorization: Bearer <CRON_SECRET>"
 // ATAU query "?secret=<CRON_SECRET>".
 //
-// Satu endpoint generik loop ketiga tabel (akuisisi/marketplace/crm) -- satu-satunya beda
+// Satu endpoint generik dipakai ketiga tabel (akuisisi/marketplace/crm) -- satu-satunya beda
 // antar domain cuma nama tabel, checkResiAuto() udah rute otomatis per-row berdasar
 // `ekspedisi` jadi gak perlu percabangan level kategori. Lihat plan: bab 4.
+//
+// Parameter opsional "?domain=akuisisi|marketplace|crm" (sesi 2026-07-11): kalau di-set,
+// cuma proses tabel itu SENDIRIAN dalam invocation ini -- dipakai buat setup 3 cronjob
+// terpisah di cron-job.org (1 job per domain, jadwal & timeout bisa diatur sendiri-sendiri,
+// tabel yang lelet gak "makan" waktu tabel lain). Kalau parameter gak di-set, tetep loop
+// ketiga tabel sekaligus kayak sebelumnya (backward-compatible buat job lama yang belum
+// dipecah).
 
 const { sbFetch } = require('../lib/supabase-rest');
 const { checkResiAuto, AUTO_EKSPEDISI_LIST } = require('../lib/tracking-router');
@@ -12,8 +19,14 @@ const { STAGE_STEP } = require('../lib/stage-engine');
 const { sendFonnteWA } = require('../lib/fonnte');
 
 const TABLES = ['akuisisi_orders', 'marketplace_orders', 'crm_orders'];
+const DOMAIN_TABLE_MAP = { akuisisi: 'akuisisi_orders', marketplace: 'marketplace_orders', crm: 'crm_orders' };
 const PROBLEM_STAGES = ['BERMASALAH', 'RETUR'];
-const ROWS_PER_RUN = 300;
+// cron-job.org plan yang dipake cuma dukung timeout maks 30 detik -- itu yang jadi batas
+// keras (bukan maxDuration 60s Vercel). ROWS_PER_RUN_SINGLE dipakai kalau ?domain= di-set
+// (1 tabel per invocation, jadi bisa lebih longgar); ROWS_PER_RUN_ALL kalau mode gabungan
+// lama (3 tabel sekaligus, harus jauh lebih kecil biar semua kebagian dalam 30 detik).
+const ROWS_PER_RUN_SINGLE = 100;
+const ROWS_PER_RUN_ALL = 50;
 const BATCH = 5;
 
 // Order yang udah lebih tua dari ini TAPI masih belum SAMPAI/RETUR kemungkinan besar udah
@@ -79,17 +92,30 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const domainParam = req.query.domain;
+  let tablesToRun = TABLES;
+  let rowsPerRun = ROWS_PER_RUN_ALL;
+  if (domainParam) {
+    const table = DOMAIN_TABLE_MAP[domainParam];
+    if (!table) {
+      res.status(400).json({ error: `domain tidak dikenal: "${domainParam}" -- pakai akuisisi/marketplace/crm` });
+      return;
+    }
+    tablesToRun = [table];
+    rowsPerRun = ROWS_PER_RUN_SINGLE;
+  }
+
   const ekspedisiFilter = AUTO_EKSPEDISI_LIST.map(e => encodeURIComponent(e)).join(',');
   const cutoff = cutoffDateYMD();
   const teamLookup = await loadTeamLookup();
   let checked = 0, updated = 0, failed = 0, notified = 0;
   const errors = [];
 
-  for (const table of TABLES) {
+  for (const table of tablesToRun) {
     let rows;
     try {
       rows = await sbFetch(
-        `${table}?select=${TABLE_SELECT[table]}&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${ROWS_PER_RUN}`
+        `${table}?select=${TABLE_SELECT[table]}&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${rowsPerRun}`
       );
     } catch (e) {
       errors.push(`${table}: gagal fetch (${e.message})`);
