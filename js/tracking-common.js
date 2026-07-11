@@ -369,6 +369,8 @@ function initTrackingPage(cfg) {
       row['Ekspedisi'] = o.ekspedisi || '';
       row['Kota Tujuan'] = o.kota_tujuan || '';
       row['Status'] = statusLabel;
+      const latestRecord = o.status_resi_detail?.records?.[0];
+      row['Keterangan'] = latestRecord ? (latestRecord.description || latestRecord.tracking_name || '') : '';
       if (o.cs_nama) row['CS'] = o.cs_nama;
       return row;
     });
