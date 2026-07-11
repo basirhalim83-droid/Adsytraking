@@ -390,8 +390,11 @@ function initTrackingPage(cfg) {
     const initial = name.trim().charAt(0).toUpperCase() || '?';
     const mpBadge = cfg.hasMarketplaceFilter && o.marketplace && MP_BADGE[o.marketplace]
       ? `<span class="badge ${MP_BADGE[o.marketplace][0]}">${MP_BADGE[o.marketplace][1]}</span>` : '';
-    const followupBadge = stage === 'BERMASALAH'
-      ? `<span class="badge badge-gray">📋 ${o.followup_attempts || 0}/3${o.followup_responded ? ' ✅' : ''}${o.followup_courier_notified ? ' 📦' : ''}</span>` : '';
+    const followupBadge = stage === 'BERMASALAH' ? [
+      (o.followup_attempts || 0) > 0 ? `<span class="badge badge-warning">🔔 Percobaan ke-${o.followup_attempts}</span>` : '',
+      o.followup_responded ? `<span class="badge badge-success">✅ Sudah Direspon</span>` : '',
+      o.followup_courier_notified ? `<span class="badge badge-success">📦 Sudah Hubungi Kurir</span>` : '',
+    ].join('') : '';
 
     return `<div class="tr-card" onclick="trOpenDetail('${o.id}')">
       <div class="tr-card-top">
