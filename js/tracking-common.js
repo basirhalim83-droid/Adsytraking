@@ -281,6 +281,7 @@ function initTrackingPage(cfg) {
               </div>
             </div>
             <button class="btn btn-primary btn-sm" id="trRefreshBtn" onclick="trRefreshAll()">🔄 Refresh Semua</button>
+            <button class="btn btn-outline btn-sm" onclick="trDownloadExcel()">⬇️ Download Excel</button>
             ${typeof openUploadModal === 'function' ? `<button class="btn btn-outline btn-sm" onclick="openUploadModal('${cfg.domain}')">📥 Upload</button>` : ''}
           </div>
         </div>
@@ -334,12 +335,49 @@ function initTrackingPage(cfg) {
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return true;
     });
+    st.filteredList = list;
     document.getElementById('trCount').textContent = `${list.length} pesanan`;
     document.getElementById('trList').innerHTML = list.length
       ? list.map(o => cardHtml(o)).join('')
       : '<div class="tr-card" style="grid-column:1/-1;text-align:center;color:var(--text-3);cursor:default">Tidak ada data.</div>';
   }
   window.trApplyFilter = applyFilter;
+
+  // Export Excel -- ngikutin filter yang lagi aktif (tab/search/toko/ekspedisi/tanggal),
+  // bukan seluruh st.orders, biar hasil download = persis yang lagi keliatan di layar.
+  window.trDownloadExcel = () => {
+    const list = st.filteredList || [];
+    if (!list.length) { showToast('Tidak ada data untuk didownload', 'info'); return; }
+    const rows = list.map(o => {
+      const stage = trEffectiveStage(o);
+      const statusLabel = (TR_STAGE_META[stage] || TR_STAGE_META.BELUM_DICEK).label.replace(/^\S+\s*/, '');
+      const row = {
+        Resi: String(o.id).startsWith('IMP-') ? '' : o.id,
+        Tanggal: o.order_date || '',
+        Nama: o.nama || o.buyer || '',
+      };
+      if (cfg.hasMarketplaceFilter) {
+        row['Toko'] = o.store_name || '';
+        row['Marketplace'] = o.marketplace ? (MP_BADGE[o.marketplace]?.[1] || o.marketplace) : '';
+      } else {
+        row['No HP'] = o.hp || '';
+        row['Alamat'] = o.alamat || '';
+      }
+      row['Produk'] = o.produk || '';
+      row['Qty'] = o.qty || 1;
+      row['Total'] = o.total || 0;
+      row['Ekspedisi'] = o.ekspedisi || '';
+      row['Kota Tujuan'] = o.kota_tujuan || '';
+      row['Status'] = statusLabel;
+      if (o.cs_nama) row['CS'] = o.cs_nama;
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, cfg.domainLabel);
+    XLSX.writeFile(wb, `Tracking-${cfg.domainLabel}-${trYmd(new Date())}.xlsx`);
+    showToast(`✅ ${rows.length} data diexport`, 'success');
+  };
 
   function cardHtml(o) {
     const stage = trEffectiveStage(o);
