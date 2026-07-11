@@ -390,6 +390,8 @@ function initTrackingPage(cfg) {
     const initial = name.trim().charAt(0).toUpperCase() || '?';
     const mpBadge = cfg.hasMarketplaceFilter && o.marketplace && MP_BADGE[o.marketplace]
       ? `<span class="badge ${MP_BADGE[o.marketplace][0]}">${MP_BADGE[o.marketplace][1]}</span>` : '';
+    const followupBadge = stage === 'BERMASALAH'
+      ? `<span class="badge badge-gray">📋 ${o.followup_attempts || 0}/3${o.followup_responded ? ' ✅' : ''}${o.followup_courier_notified ? ' 📦' : ''}</span>` : '';
 
     return `<div class="tr-card" onclick="trOpenDetail('${o.id}')">
       <div class="tr-card-top">
@@ -403,6 +405,7 @@ function initTrackingPage(cfg) {
               ${mpBadge}
               ${o.ekspedisi ? `<span class="badge badge-gray">${escapeHtml(o.ekspedisi)}</span>` : ''}
               ${o.cs_nama ? `<span class="badge badge-primary">👤 ${escapeHtml(o.cs_nama)}</span>` : ''}
+              ${followupBadge}
             </div>
             <div class="tr-produk" title="${escapeHtml(o.produk || '-')}">${escapeHtml(o.produk || '-')} × ${o.qty || 1}</div>
           </div>
@@ -440,12 +443,57 @@ function initTrackingPage(cfg) {
         </div>`).join('')}</div>`;
     }
 
+    const followupHtml = stage === 'BERMASALAH' ? `
+      <div style="margin-top:16px;padding:12px;border-radius:10px;background:var(--bg-2,rgba(0,0,0,.03))">
+        <div style="font-weight:700;font-size:.8rem;margin-bottom:10px">📋 Follow Up Bermasalah</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:.8rem">Percobaan info CS: <strong id="trFollowupCount">${o.followup_attempts || 0}/3</strong></span>
+          <button class="btn btn-outline btn-sm" id="trFollowupAttemptBtn" onclick="trFollowupAttempt()" ${(o.followup_attempts || 0) >= 3 ? 'disabled' : ''}>+ Catat Percobaan</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;margin-bottom:6px;cursor:pointer">
+          <input type="checkbox" ${o.followup_responded ? 'checked' : ''} onchange="trFollowupToggle('followup_responded', this.checked)"> Sudah Direspon CS
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer">
+          <input type="checkbox" ${o.followup_courier_notified ? 'checked' : ''} onchange="trFollowupToggle('followup_courier_notified', this.checked)"> Sudah Diinfo ke Kurir
+        </label>
+      </div>
+    ` : '';
+
     document.getElementById('trkModalBody').innerHTML = `
       <div style="margin-top:10px"><span class="badge ${meta.badge}">${meta.label}</span></div>
       ${trStepperHtml(stage)}
+      ${followupHtml}
       ${historyHtml}
     `;
     document.getElementById('trkModalOverlay').classList.add('open');
+  };
+
+  window.trFollowupAttempt = async () => {
+    const o = st.orders.find(x => String(x.id) === String(st.modalId));
+    if (!o) return;
+    const next = Math.min(3, (o.followup_attempts || 0) + 1);
+    try {
+      await dbUpdateFollowup(cfg.table, o.id, { followup_attempts: next });
+      o.followup_attempts = next;
+      document.getElementById('trFollowupCount').textContent = `${next}/3`;
+      if (next >= 3) document.getElementById('trFollowupAttemptBtn').disabled = true;
+      applyFilter();
+      showToast(`✅ Percobaan ke-${next} dicatat`, 'success');
+    } catch (e) {
+      showToast('❌ ' + e.message, 'error');
+    }
+  };
+
+  window.trFollowupToggle = async (field, checked) => {
+    const o = st.orders.find(x => String(x.id) === String(st.modalId));
+    if (!o) return;
+    try {
+      await dbUpdateFollowup(cfg.table, o.id, { [field]: checked });
+      o[field] = checked;
+      applyFilter();
+    } catch (e) {
+      showToast('❌ ' + e.message, 'error');
+    }
   };
 
   window.trCloseModal = () => document.getElementById('trkModalOverlay').classList.remove('open');

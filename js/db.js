@@ -78,6 +78,13 @@ async function dbGetTrackableOrders(table, filters = {}) {
   return all;
 }
 
+// Follow-up manual buat resi Bermasalah (percobaan/direspon/diinfo kurir) -- status ringkas
+// aja, gak ada tabel histori terpisah (keputusan user 2026-07-11, lihat sql/006).
+async function dbUpdateFollowup(table, id, patch) {
+  const { error } = await _sb.from(table).update(patch).eq('id', id);
+  if (error) throw error;
+}
+
 // ── Upload batches ────────────────────────────────────────────────────────────
 // Dedup within batch by id (keep last), cek existing id di Supabase per-chunk 500,
 // upsert new rows aja. Port dari Marketplace-main/js/db.js (dbBulkInsertMarketplaceOrders),
