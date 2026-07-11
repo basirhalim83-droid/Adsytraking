@@ -335,6 +335,14 @@ function initTrackingPage(cfg) {
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return true;
     });
+    // Tab Bermasalah: otomatis urutin yang paling belum ditindak duluan (percobaan/direspon/
+    // diinfo kurir paling sedikit) -- biar yang paling butuh perhatian gampang keliatan tanpa
+    // perlu kontrol sort manual. Stage lain gak diubah urutannya (tetap by order_date desc
+    // dari query).
+    if (st.filterStage === 'BERMASALAH') {
+      const followupScore = o => (o.followup_attempts || 0) + (o.followup_responded ? 1 : 0) + (o.followup_courier_notified ? 1 : 0);
+      list.sort((a, b) => followupScore(a) - followupScore(b));
+    }
     st.filteredList = list;
     document.getElementById('trCount').textContent = `${list.length} pesanan`;
     document.getElementById('trList').innerHTML = list.length
