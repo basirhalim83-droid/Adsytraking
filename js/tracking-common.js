@@ -117,6 +117,8 @@ function initTrackingPage(cfg) {
     storeFilter: '',
     storeOptions: [],
     ekspedisiFilter: '',
+    csFilter: '',
+    produkFilter: '',
   };
   const today = new Date();
   st.filterStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -212,6 +214,14 @@ function initTrackingPage(cfg) {
   function ekspedisiOptions() {
     return [...new Set(st.orders.map(o => o.ekspedisi).filter(Boolean))].sort();
   }
+  // CS & Produk cuma relevan buat Akuisisi/CRM (cs_nama gak ada konsepnya di Marketplace) --
+  // pattern sama kayak ekspedisiOptions, opsi dinamis dari data yang lagi ke-load.
+  function csOptions() {
+    return [...new Set(st.orders.map(o => o.cs_nama).filter(Boolean))].sort();
+  }
+  function produkOptions() {
+    return [...new Set(st.orders.map(o => o.produk).filter(Boolean))].sort();
+  }
 
   function renderPage() {
     document.getElementById('pageContent').innerHTML = `
@@ -251,6 +261,15 @@ function initTrackingPage(cfg) {
               <option value="">Semua Ekspedisi</option>
               ${ekspedisiOptions().map(e => `<option value="${escapeHtml(e)}" ${st.ekspedisiFilter===e?'selected':''}>${escapeHtml(e)}</option>`).join('')}
             </select>
+            ${!cfg.hasMarketplaceFilter ? `
+              <select class="ctrl-select" id="trCsFilter" onchange="trSetCsFilter(this.value)">
+                <option value="">Semua CS</option>
+                ${csOptions().map(c => `<option value="${escapeHtml(c)}" ${st.csFilter===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+              </select>
+              <select class="ctrl-select" id="trProdukFilter" onchange="trSetProdukFilter(this.value)">
+                <option value="">Semua Produk</option>
+                ${produkOptions().map(p => `<option value="${escapeHtml(p)}" ${st.produkFilter===p?'selected':''}>${escapeHtml(p)}</option>`).join('')}
+              </select>` : ''}
             <div class="drp-wrap">
               <button class="drp-trigger" onclick="trDrpToggle()" id="trDrp-trigger">
                 <span>📅</span><span id="trDrp-label">${st.drpLabelText}</span><span style="color:var(--text-3)">▾</span>
@@ -323,6 +342,8 @@ function initTrackingPage(cfg) {
   window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; load(); };
   window.trSetStoreFilter = (val) => { st.storeFilter = val; applyFilter(); };
   window.trSetEkspedisiFilter = (val) => { st.ekspedisiFilter = val; applyFilter(); };
+  window.trSetCsFilter = (val) => { st.csFilter = val; applyFilter(); };
+  window.trSetProdukFilter = (val) => { st.produkFilter = val; applyFilter(); };
 
   function applyFilter() {
     const q = (document.getElementById('trSearch').value || '').toLowerCase();
@@ -332,6 +353,8 @@ function initTrackingPage(cfg) {
       else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
       if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
+      if (st.csFilter && o.cs_nama !== st.csFilter) return false;
+      if (st.produkFilter && o.produk !== st.produkFilter) return false;
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return true;
     });
