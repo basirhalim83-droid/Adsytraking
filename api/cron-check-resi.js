@@ -114,8 +114,14 @@ module.exports = async function handler(req, res) {
   for (const table of tablesToRun) {
     let rows;
     try {
+      // order by status_resi_updated_at (belum pernah dicek/null duluan, terus paling lama
+      // belum dicek) -- BUKAN by id. Kalau by id, tiap run cuma balik ngecek 100 resi
+      // ber-id-terkecil yang SAMA terus-menerus selama itu masih aktif, resi lain gak
+      // pernah kesentuh cron sampai antrean di depannya beres (starvation, ketauan sesi
+      // 2026-07-11 pas backlog akuisisi udah ~1000 resi aktif). By status_resi_updated_at
+      // otomatis "gantian" tiap run ke resi yang paling butuh dicek duluan.
       rows = await sbFetch(
-        `${table}?select=${TABLE_SELECT[table]}&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=id&limit=${rowsPerRun}`
+        `${table}?select=${TABLE_SELECT[table]}&ekspedisi=in.(${ekspedisiFilter})&status_resi=not.in.(SAMPAI,RETUR)&id=not.like.IMP-*&order_date=gte.${cutoff}&order=status_resi_updated_at.asc.nullsfirst&limit=${rowsPerRun}`
       );
     } catch (e) {
       errors.push(`${table}: gagal fetch (${e.message})`);
