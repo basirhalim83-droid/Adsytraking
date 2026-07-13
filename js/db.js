@@ -110,7 +110,7 @@ async function dbBulkInsertOrders(table, rows, batchId, uploaderId) {
   }
 
   const newRows = unique.filter(r => !existingIds.has(r.id));
-  const skipped = unique.length - newRows.length;
+  const updateRows = unique.filter(r => existingIds.has(r.id));
 
   const CHUNK = 500;
   for (let i = 0; i < newRows.length; i += CHUNK) {
@@ -119,7 +119,27 @@ async function dbBulkInsertOrders(table, rows, batchId, uploaderId) {
     if (error) throw error;
   }
 
-  return { saved: newRows.length, skipped, duplicateInBatch };
+  // Resi yang UDAH ada di database -- upload ulang dianggap "refresh" data sumber (dipakai
+  // buat backfill order lama yang kena bug parsing versi lama, mis. ekspedisi kosong gara-gara
+  // header typo yang gak ke-detect). Upsert cuma nyertain kolom ini di payload -- Postgres ON
+  // CONFLICT DO UPDATE cuma nge-update kolom yang disertain, jadi status_resi*/followup_*
+  // (punya cron/interaksi user, bukan urusan upload) SENGAJA gak ikut ke-reset.
+  const REFRESH_FIELDS = ['nama', 'hp', 'alamat', 'kota_tujuan', 'produk', 'qty', 'total', 'ekspedisi', 'order_date', 'cs_nama', 'buyer', 'sku', 'unit_price', 'status', 'upload_batch_id', 'uploaded_by'];
+  if (updateRows.length) {
+    const patches = updateRows.map(r => {
+      const patch = {};
+      REFRESH_FIELDS.forEach(f => { if (r[f] !== undefined) patch[f] = r[f]; });
+      patch.id = r.id;
+      return patch;
+    });
+    for (let i = 0; i < patches.length; i += CHUNK) {
+      const chunk = patches.slice(i, i + CHUNK);
+      const { error } = await _sb.from(table).upsert(chunk, { onConflict: 'id' });
+      if (error) throw error;
+    }
+  }
+
+  return { saved: newRows.length, updated: updateRows.length, duplicateInBatch };
 }
 
 async function dbInsertUploadBatch(batch) {

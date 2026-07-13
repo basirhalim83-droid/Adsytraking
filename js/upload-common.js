@@ -264,23 +264,25 @@ async function applyUploadData() {
       throw e;
     }
 
-    if (result.saved === 0) {
+    if (result.saved === 0 && result.updated === 0) {
       await dbDeleteUploadBatchRow(batchId);
       closeUploadModal();
-      const reasons = [];
-      if (result.duplicateInBatch > 0) reasons.push(`${result.duplicateInBatch} duplikat dalam file`);
-      if (result.skipped > 0) reasons.push(`${result.skipped} sudah ada di database`);
-      showToast(`ℹ️ Tidak ada yang ditambahkan (${reasons.join(', ') || 'semua sudah ada'}).`, 'info');
+      const msg = result.duplicateInBatch > 0
+        ? `ℹ️ Tidak ada yang ditambahkan (${result.duplicateInBatch} duplikat dalam file).`
+        : 'ℹ️ Tidak ada yang ditambahkan.';
+      showToast(msg, 'info');
       return;
     }
 
     await dbUpdateUploadBatchCount(batchId, result.saved);
     closeUploadModal();
-    let msg = `✅ ${result.saved} data berhasil disimpan!`;
-    const reasons = [];
-    if (result.duplicateInBatch > 0) reasons.push(`${result.duplicateInBatch} duplikat dalam file`);
-    if (result.skipped > 0) reasons.push(`${result.skipped} sudah ada di database`);
-    if (reasons.length) msg += ` (dilewati: ${reasons.join(', ')})`;
+    const parts = [];
+    if (result.saved > 0) parts.push(`${result.saved} baru disimpan`);
+    // Resi yang udah ada di database di-refresh datanya (nama/produk/ekspedisi/dll dari file
+    // ini), bukan di-skip -- dipakai buat backfill order lama yang kena bug parsing versi lama.
+    if (result.updated > 0) parts.push(`${result.updated} data lama diperbarui`);
+    let msg = `✅ ${parts.join(', ')}!`;
+    if (result.duplicateInBatch > 0) msg += ` (${result.duplicateInBatch} duplikat dalam file dilewati)`;
     showToast(msg, 'success');
     if (typeof trReload === 'function') trReload();
   } catch (e) {
