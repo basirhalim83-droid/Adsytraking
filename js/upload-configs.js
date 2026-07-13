@@ -85,6 +85,21 @@ function _splitNamaSku(rawNama) {
   return { nama: parts[0] || '', sku: parts[1] || '' };
 }
 
+// Segmen SKU bisa berisi beberapa kode digabung (order bundling), mis. "ORI 1 MAK 1"
+// = 1x OIRI + 1x MAKSIR. Format tiap kode: <prefix huruf><qty angka>, prefix dicocokkan
+// ke tabel sku_produk (kode di sana cuma prefix huruf, gak termasuk angka qty-nya).
+function _parseSkuBundle(raw, skuMap) {
+  const tokens = [...String(raw || '').matchAll(/([A-Za-z]+)\s*(\d+)/g)];
+  if (!tokens.length) return { produk: '', qty: 0 };
+  const names = [];
+  let qty = 0;
+  for (const [, code, num] of tokens) {
+    qty += parseInt(num, 10) || 0;
+    names.push((skuMap && skuMap.get(code.trim().toUpperCase())) || code.trim());
+  }
+  return { produk: names.join(', '), qty };
+}
+
 // ── Marketplace (Shopee/TikTok/Lazada) -- port near-verbatim dari Marketplace-main ─
 const MP_CONFIG = {
   shopee: {
@@ -218,8 +233,10 @@ function _parseSimpleOrderRows(rows, mapping, domain, skuMap) {
     const ekspedisiRaw = get(mapping.ekspedisi) || get(mapping.pembayaran);
     const { nama: namaClean, sku: namaSku } = _splitNamaSku(get(mapping.nama));
     const produkFromCol = String(get(mapping.produk) || '').trim();
-    const kodeSku = produkFromCol || namaSku;
-    const produkFinal = (skuMap && skuMap.get(kodeSku.trim().toUpperCase())) || kodeSku;
+    const bundle = namaSku ? _parseSkuBundle(namaSku, skuMap) : null;
+    const produkFinal = produkFromCol || (bundle && bundle.produk) || namaSku;
+    const qtyFromCol = mapping.qty ? _safeParseInt(get(mapping.qty)) : null;
+    const qtyFinal = qtyFromCol || (bundle && bundle.qty) || 1;
     return {
       id: _fixSciNotation(get(mapping.id) || ('IMP-' + domain + '-' + i)) || ('IMP-' + domain + '-' + i),
       order_date: _parseDate(rawDate),
@@ -228,7 +245,7 @@ function _parseSimpleOrderRows(rows, mapping, domain, skuMap) {
       alamat: String(get(mapping.alamat) || '').trim(),
       kota_tujuan: String(get(mapping.kota_tujuan) || '').trim(),
       produk: produkFinal,
-      qty: _safeParseInt(get(mapping.qty)) || 1,
+      qty: qtyFinal,
       total: _parsePrice(get(mapping.total)),
       ekspedisi: _normalizeEkspedisi(ekspedisiRaw),
       cs_nama: extractCsName(get(mapping.instruksi)),
