@@ -194,3 +194,12 @@ async function dbDeleteTeamMember(id) {
   const { error } = await _sb.from('team_members').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ── Mapping kode SKU -> nama produk (copy manual dari ekosistem ValidasiOrder) ─
+async function dbGetSkuMap() {
+  const { data, error } = await _sb.from('sku_produk').select('kode,nama_produk');
+  if (error) throw error;
+  const map = new Map();
+  (data || []).forEach(r => map.set(String(r.kode).trim().toUpperCase(), r.nama_produk));
+  return map;
+}

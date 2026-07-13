@@ -188,7 +188,8 @@ function handleUploadFile(file) {
           document.getElementById('uploadFileInfo').innerHTML = `<span style="color:var(--danger)">❌ Kolom resi/nomor resi tidak ditemukan di header file.</span>`;
           return;
         }
-        _upState.parsedRows = _parseSimpleOrderRows(rows, mapping, domain);
+        const skuMap = await dbGetSkuMap();
+        _upState.parsedRows = _parseSimpleOrderRows(rows, mapping, domain, skuMap);
       }
 
       renderUploadModal();

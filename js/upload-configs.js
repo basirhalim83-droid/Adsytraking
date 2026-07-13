@@ -78,6 +78,13 @@ function _normalizeEkspedisi(raw) {
   return up;
 }
 
+// Beberapa file akuisisi nulis "NAMA" gabungan pipe: "<nama pelanggan>|<SKU>|<kode promo>"
+// (ketauan dari GHAZI AKUISISI 2 1-10.xlsx). Kode promo sengaja dibuang -- gak dipakai.
+function _splitNamaSku(rawNama) {
+  const parts = String(rawNama || '').split('|').map(s => s.trim());
+  return { nama: parts[0] || '', sku: parts[1] || '' };
+}
+
 // ── Marketplace (Shopee/TikTok/Lazada) -- port near-verbatim dari Marketplace-main ─
 const MP_CONFIG = {
   shopee: {
@@ -177,14 +184,14 @@ function _makeSimpleOrderConfig(domainLabel) {
       id: h => _findCol(h, ['no. resi', 'nomor resi', 'resi', 'awb']),
       date: h => _findCol(h, ['tanggal', 'tgl']),
       nama: h => _findCol(h, ['nama', 'nama pelanggan', 'customer']),
-      hp: h => _findCol(h, ['no hp', 'no telpon', 'no telepon', 'hp', 'whatsapp', 'no wa', 'nomor hp']),
+      hp: h => _findCol(h, ['no hp', 'no telpon', 'no telepon', 'no telp', 'hp', 'whatsapp', 'no wa', 'nomor hp']),
       alamat: h => _findCol(h, ['alamat']),
       kota_tujuan: h => _findCol(h, ['kabupaten', 'kota', 'kota/kabupaten', 'kota tujuan']),
       produk: h => _findCol(h, ['produk', 'nama produk', 'jumlah pesanan']),
       qty: h => _findCol(h, ['qty', 'quantity', 'jumlah']),
       total: h => _findCol(h, ['total pembayaran', 'total', 'harga', 'nominal']),
       pembayaran: h => _findCol(h, ['pembayaran', 'metode pembayaran']),
-      ekspedisi: h => _findCol(h, ['ekspedisi', 'kurir', 'expedisi']),
+      ekspedisi: h => _findCol(h, ['ekspedisi', 'kurir', 'expedisi', 'ekpedisi']),
       instruksi: h => _findCol(h, ['instruksi pengiriman', 'instruksi']),
     },
   };
@@ -204,19 +211,23 @@ function extractCsName(instruksi) {
     .trim();
 }
 
-function _parseSimpleOrderRows(rows, mapping, domain) {
+function _parseSimpleOrderRows(rows, mapping, domain, skuMap) {
   return rows.map((row, i) => {
     const get = col => col ? (row[col] ?? '') : '';
     const rawDate = get(mapping.date);
     const ekspedisiRaw = get(mapping.ekspedisi) || get(mapping.pembayaran);
+    const { nama: namaClean, sku: namaSku } = _splitNamaSku(get(mapping.nama));
+    const produkFromCol = String(get(mapping.produk) || '').trim();
+    const kodeSku = produkFromCol || namaSku;
+    const produkFinal = (skuMap && skuMap.get(kodeSku.trim().toUpperCase())) || kodeSku;
     return {
       id: _fixSciNotation(get(mapping.id) || ('IMP-' + domain + '-' + i)) || ('IMP-' + domain + '-' + i),
       order_date: _parseDate(rawDate),
-      nama: String(get(mapping.nama) || '').trim(),
+      nama: namaClean,
       hp: _fixSciNotation(get(mapping.hp)),
       alamat: String(get(mapping.alamat) || '').trim(),
       kota_tujuan: String(get(mapping.kota_tujuan) || '').trim(),
-      produk: String(get(mapping.produk) || '').trim(),
+      produk: produkFinal,
       qty: _safeParseInt(get(mapping.qty)) || 1,
       total: _parsePrice(get(mapping.total)),
       ekspedisi: _normalizeEkspedisi(ekspedisiRaw),
