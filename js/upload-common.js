@@ -256,9 +256,16 @@ async function applyUploadData() {
       record_count: _upState.parsedRows.length,
     });
 
+    // Inject store_name & marketplace ke tiap row supaya bisa difilter di halaman tracking.
+    // Sebelumnya hanya disimpan di upload_batches, tapi marketplace_orders.store_name
+    // dibiarkan NULL sehingga filter per toko tidak pernah bisa match.
+    const rowsToInsert = domain === 'marketplace'
+      ? _upState.parsedRows.map(r => ({ ...r, store_name: _upState.storeName || null }))
+      : _upState.parsedRows;
+
     let result;
     try {
-      result = await dbBulkInsertOrders(table, _upState.parsedRows, batchId, session.user.id);
+      result = await dbBulkInsertOrders(table, rowsToInsert, batchId, session.user.id);
     } catch (e) {
       await dbDeleteUploadBatchRow(batchId);
       throw e;
