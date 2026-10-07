@@ -58,13 +58,19 @@ async function dbGetProfile(userId) {
 // Di-page pake .range() 1000 per batch -- PostgREST default max-rows 1000, tanpa ini query
 // diam-diam kepotong pas order-nya lebih dari 1000 (ketauan dari Tracking Akuisisi yang macet
 // pas "Total: 1000" padahal resi aslinya lebih banyak).
+//
+// PENTING: status_resi_detail (JSONB besar, raw response kurir) SENGAJA dikecualikan dari
+// select list -- kolom ini bisa puluhan KB per baris dan jadi penyebab utama egress meledak.
+// Fetch status_resi_detail hanya saat buka modal detail 1 order via dbGetOrderDetail().
+const TR_LIST_COLUMNS = 'id,order_date,nama,hp,alamat,produk,qty,total,resi,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,marketplace,sku,buyer,store_name,status,cs_nama,followup_attempts,followup_responded,followup_courier_notified';
+
 async function dbGetTrackableOrders(table, filters = {}) {
   const PAGE = 1000;
   let all = [];
   let page = 0;
   let hasMore = true;
   while (hasMore) {
-    let q = _sb.from(table).select('*').order('order_date', { ascending: false });
+    let q = _sb.from(table).select(TR_LIST_COLUMNS).order('order_date', { ascending: false });
     if (filters.dateFrom) q = q.gte('order_date', filters.dateFrom);
     if (filters.dateTo)   q = q.lte('order_date', filters.dateTo);
     if (filters.marketplace) q = q.eq('marketplace', filters.marketplace);
@@ -76,6 +82,15 @@ async function dbGetTrackableOrders(table, filters = {}) {
     page++;
   }
   return all;
+}
+
+// Fetch 1 order lengkap termasuk status_resi_detail -- dipanggil hanya saat buka modal detail.
+// Dipisah dari dbGetTrackableOrders supaya status_resi_detail (JSONB besar) tidak ikut
+// ditarik saat list biasa → hemat egress signifikan.
+async function dbGetOrderDetail(table, id) {
+  const { data, error } = await _sb.from(table).select('*').eq('id', id).single();
+  if (error) throw error;
+  return data;
 }
 
 // Follow-up manual buat resi Bermasalah (percobaan/direspon/diinfo kurir) -- status ringkas

@@ -400,8 +400,8 @@ function initTrackingPage(cfg) {
       row['Ekspedisi'] = o.ekspedisi || '';
       row['Kota Tujuan'] = o.kota_tujuan || '';
       row['Status'] = statusLabel;
-      const latestRecord = o.status_resi_detail?.records?.[0];
-      row['Keterangan'] = latestRecord ? (latestRecord.description || latestRecord.tracking_name || '') : '';
+      // status_resi_detail tidak di-fetch saat list (hemat egress) -- kolom Keterangan dikosongkan di export
+      row['Keterangan'] = '';
       if (o.cs_nama) row['CS'] = o.cs_nama;
       return row;
     });
@@ -454,17 +454,10 @@ function initTrackingPage(cfg) {
     </div>`;
   }
 
-  window.trOpenDetail = (id) => {
-    st.modalId = id;
-    const o = st.orders.find(x => String(x.id) === String(id));
-    if (!o) return;
+  function renderModalBody(o, detail) {
     const stage = trEffectiveStage(o);
     const meta  = TR_STAGE_META[stage] || TR_STAGE_META.BELUM_DICEK;
-
-    document.getElementById('trkModalTitle').textContent = o.produk || 'Detail Pengiriman';
-    document.getElementById('trkModalSub').textContent = o.id + (o.ekspedisi ? ' · ' + o.ekspedisi : '');
-
-    const records = o.status_resi_detail?.records || [];
+    const records = detail?.records || [];
     let historyHtml = '<div style="font-size:.78rem;color:var(--text-3);margin-top:12px">Belum ada history — klik "Cek Ulang".</div>';
     if (records.length) {
       historyHtml = `<div style="margin-top:14px">${records.map((r, i) => `
@@ -476,7 +469,6 @@ function initTrackingPage(cfg) {
           </div>
         </div>`).join('')}</div>`;
     }
-
     const followupHtml = stage === 'BERMASALAH' ? `
       <div style="margin-top:16px;padding:12px;border-radius:10px;background:var(--bg-2,rgba(0,0,0,.03))">
         <div style="font-weight:700;font-size:.8rem;margin-bottom:10px">📋 Follow Up Bermasalah</div>
@@ -492,14 +484,32 @@ function initTrackingPage(cfg) {
         </label>
       </div>
     ` : '';
-
     document.getElementById('trkModalBody').innerHTML = `
       <div style="margin-top:10px"><span class="badge ${meta.badge}">${meta.label}</span></div>
       ${trStepperHtml(stage)}
       ${followupHtml}
       ${historyHtml}
     `;
+  }
+
+  // status_resi_detail TIDAK ada di st.orders (sengaja dikecualikan dari list query untuk hemat
+  // egress). Fetch per-order hanya saat modal dibuka -- 1 baris saja, bukan seluruh tabel.
+  window.trOpenDetail = async (id) => {
+    st.modalId = id;
+    const o = st.orders.find(x => String(x.id) === String(id));
+    if (!o) return;
+    document.getElementById('trkModalTitle').textContent = o.produk || 'Detail Pengiriman';
+    document.getElementById('trkModalSub').textContent = o.id + (o.ekspedisi ? ' · ' + o.ekspedisi : '');
+    document.getElementById('trkModalBody').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-3);font-size:.85rem">Memuat detail...</div>';
     document.getElementById('trkModalOverlay').classList.add('open');
+    try {
+      const full = await dbGetOrderDetail(cfg.table, id);
+      // Sync status_resi_detail ke entry di st.orders supaya trManualCheckFromModal tetap jalan
+      if (full) Object.assign(o, { status_resi_detail: full.status_resi_detail });
+      renderModalBody(o, full?.status_resi_detail);
+    } catch (e) {
+      document.getElementById('trkModalBody').innerHTML = `<div style="padding:24px;text-align:center;color:var(--danger);font-size:.85rem">Gagal memuat detail: ${escapeHtml(e.message)}</div>`;
+    }
   };
 
   window.trFollowupAttempt = async () => {
