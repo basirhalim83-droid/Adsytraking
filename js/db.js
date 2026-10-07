@@ -65,7 +65,7 @@ async function dbGetProfile(userId) {
 // Kolom untuk akuisisi & crm (punya nama/hp/alamat/cs_nama, tidak punya marketplace/sku/buyer/store_name/status)
 const TR_LIST_COLUMNS_DEFAULT = 'id,order_date,nama,hp,alamat,produk,qty,total,resi,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,cs_nama,followup_attempts,followup_responded,followup_courier_notified';
 // Kolom untuk marketplace (punya buyer/marketplace/sku/store_name/status, tidak punya nama/hp/alamat/cs_nama)
-const TR_LIST_COLUMNS_MARKETPLACE = 'id,order_date,produk,qty,total,resi,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,marketplace,sku,buyer,store_name,status,followup_attempts,followup_responded,followup_courier_notified';
+const TR_LIST_COLUMNS_MARKETPLACE = 'id,order_date,produk,qty,unit_price,total,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,marketplace,sku,buyer,store_name,status,followup_attempts,followup_responded,followup_courier_notified';
 
 async function dbGetTrackableOrders(table, filters = {}) {
   const cols = table === 'marketplace_orders' ? TR_LIST_COLUMNS_MARKETPLACE : TR_LIST_COLUMNS_DEFAULT;
