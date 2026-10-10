@@ -119,6 +119,8 @@ function initTrackingPage(cfg) {
     ekspedisiFilter: '',
     csFilter: '',
     produkFilter: '',
+    page: 1,
+    pageSize: 50,
   };
   const today = new Date();
   st.filterStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -321,11 +323,12 @@ function initTrackingPage(cfg) {
         <div class="tr-toolbar">
           <div class="tr-tabs" id="trTabs"></div>
           <div class="tr-search-wrap">
-            <input type="text" id="trSearch" class="ctrl-input" style="width:100%" placeholder="🔍 Cari resi / nama / produk..." onkeyup="trApplyFilter()">
+            <input type="text" id="trSearch" class="ctrl-input" style="width:100%" placeholder="🔍 Cari resi / nama / produk..." onkeyup="trSearch()">
           </div>
           <div class="tr-count" id="trCount">0 pesanan</div>
         </div>
         <div id="trList"></div>
+        <div id="trPagination" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 0 4px;flex-wrap:wrap"></div>
       </div>
     `;
     renderTabs();
@@ -352,12 +355,12 @@ function initTrackingPage(cfg) {
     document.getElementById('trStatDelivery').textContent = counts.DELIVERY;
   }
 
-  window.trSetFilter = (key) => { st.filterStage = key; renderTabs(); applyFilter(); };
-  window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; load(); };
-  window.trSetStoreFilter = (val) => { st.storeFilter = val; applyFilter(); };
-  window.trSetEkspedisiFilter = (val) => { st.ekspedisiFilter = val; applyFilter(); };
-  window.trSetCsFilter = (val) => { st.csFilter = val; applyFilter(); };
-  window.trSetProdukFilter = (val) => { st.produkFilter = val; applyFilter(); };
+  window.trSetFilter = (key) => { st.filterStage = key; st.page = 1; renderTabs(); applyFilter(); };
+  window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; st.page = 1; load(); };
+  window.trSetStoreFilter = (val) => { st.storeFilter = val; st.page = 1; applyFilter(); };
+  window.trSetEkspedisiFilter = (val) => { st.ekspedisiFilter = val; st.page = 1; applyFilter(); };
+  window.trSetCsFilter = (val) => { st.csFilter = val; st.page = 1; applyFilter(); };
+  window.trSetProdukFilter = (val) => { st.produkFilter = val; st.page = 1; applyFilter(); };
 
   function applyFilter() {
     const q = (document.getElementById('trSearch').value || '').toLowerCase();
@@ -380,13 +383,34 @@ function initTrackingPage(cfg) {
       const followupScore = o => (o.followup_attempts || 0) + (o.followup_responded ? 1 : 0) + (o.followup_courier_notified ? 1 : 0);
       list.sort((a, b) => followupScore(a) - followupScore(b));
     }
-    st.filteredList = list;
+    st.filteredList = list; // simpan full list untuk Excel export
+
+    const totalPages = Math.max(1, Math.ceil(list.length / st.pageSize));
+    if (st.page > totalPages) st.page = totalPages;
+    const pageList = list.slice((st.page - 1) * st.pageSize, st.page * st.pageSize);
+
     document.getElementById('trCount').textContent = `${list.length} pesanan`;
-    document.getElementById('trList').innerHTML = list.length
-      ? list.map(o => cardHtml(o)).join('')
+    document.getElementById('trList').innerHTML = pageList.length
+      ? pageList.map(o => cardHtml(o)).join('')
       : '<div class="tr-card" style="grid-column:1/-1;text-align:center;color:var(--text-3);cursor:default">Tidak ada data.</div>';
+
+    const pag = document.getElementById('trPagination');
+    if (pag) {
+      if (totalPages <= 1) { pag.innerHTML = ''; return; }
+      const btnStyle = 'padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text-1);cursor:pointer;font-size:.82rem';
+      const disabledStyle = btnStyle + ';opacity:.4;cursor:not-allowed';
+      const start = (st.page - 1) * st.pageSize + 1;
+      const end   = Math.min(st.page * st.pageSize, list.length);
+      pag.innerHTML = `
+        <button style="${st.page <= 1 ? disabledStyle : btnStyle}" ${st.page <= 1 ? 'disabled' : ''} onclick="trGoPage(${st.page - 1})">← Sebelumnya</button>
+        <span style="font-size:.82rem;color:var(--text-2)">${start}–${end} dari ${list.length} &nbsp;·&nbsp; Hal. ${st.page}/${totalPages}</span>
+        <button style="${st.page >= totalPages ? disabledStyle : btnStyle}" ${st.page >= totalPages ? 'disabled' : ''} onclick="trGoPage(${st.page + 1})">Selanjutnya →</button>
+      `;
+    }
   }
   window.trApplyFilter = applyFilter;
+  window.trSearch = () => { st.page = 1; applyFilter(); };
+  window.trGoPage = (p) => { st.page = p; applyFilter(); window.scrollTo({ top: document.getElementById('trList')?.offsetTop - 80 || 0, behavior: 'smooth' }); };
 
   // Export Excel -- ngikutin filter yang lagi aktif (tab/search/toko/ekspedisi/tanggal),
   // bukan seluruh st.orders, biar hasil download = persis yang lagi keliatan di layar.
