@@ -7,10 +7,10 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  // step=1 : fix store_name dari upload_batches
+  // step=1 : fix store_name dari upload_batches (per batch, kecil)
   if (step === '1') {
     try {
-      const batches = await sbFetch('upload_batches?select=id,store_name&store_name=not.is.null&domain=eq.marketplace');
+      const batches = await sbFetch('upload_batches?select=id,store_name&store_name=not.is.null&domain=eq.marketplace&limit=20');
       let fixed = 0;
       for (const batch of batches) {
         await sbFetch(
@@ -25,44 +25,27 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // step=2 : clear status_resi_detail marketplace SAMPAI
-  if (step === '2') {
+  // step=2/3/4 : clear status_resi_detail per 50 rows sekali panggil
+  const tableMap = { '2': 'marketplace_orders', '3': 'akuisisi_orders', '4': 'crm_orders' };
+  const table = tableMap[step];
+  if (table) {
     try {
+      // Fetch 50 ID dulu
+      const rows = await sbFetch(`${table}?select=id&status_resi=eq.SAMPAI&status_resi_detail=not.is.null&limit=50`);
+      if (rows.length === 0) {
+        return res.json({ ok: true, step, table, result: 'semua sudah bersih!', done: true });
+      }
+      // Update by ID (cepat, pakai index)
+      const ids = rows.map(r => r.id).join(',');
       await sbFetch(
-        'marketplace_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
+        `${table}?id=in.(${ids})`,
         { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
       );
-      return res.json({ ok: true, step: 2, result: 'marketplace done' });
+      return res.json({ ok: true, step, table, cleared: rows.length, done: false, msg: 'panggil lagi sampai done: true' });
     } catch (e) {
-      return res.json({ ok: false, step: 2, error: e.message });
+      return res.json({ ok: false, step, table, error: e.message });
     }
   }
 
-  // step=3 : clear status_resi_detail akuisisi SAMPAI
-  if (step === '3') {
-    try {
-      await sbFetch(
-        'akuisisi_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
-        { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
-      );
-      return res.json({ ok: true, step: 3, result: 'akuisisi done' });
-    } catch (e) {
-      return res.json({ ok: false, step: 3, error: e.message });
-    }
-  }
-
-  // step=4 : clear status_resi_detail crm SAMPAI
-  if (step === '4') {
-    try {
-      await sbFetch(
-        'crm_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
-        { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
-      );
-      return res.json({ ok: true, step: 4, result: 'crm done' });
-    } catch (e) {
-      return res.json({ ok: false, step: 4, error: e.message });
-    }
-  }
-
-  res.json({ usage: 'tambahkan ?step=1, ?step=2, ?step=3, atau ?step=4' });
+  res.json({ usage: '?step=1 (fix store_name) | ?step=2 (marketplace) | ?step=3 (akuisisi) | ?step=4 (crm)' });
 };
