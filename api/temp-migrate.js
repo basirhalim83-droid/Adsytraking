@@ -7,45 +7,43 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  // step=1 : fix store_name dari upload_batches (per batch, kecil)
-  if (step === '1') {
+  // step=env : cek semua env vars yang ada
+  if (step === 'env') {
+    const keys = Object.keys(process.env).filter(k =>
+      k.includes('SUPA') || k.includes('DATABASE') || k.includes('POSTGRES') || k.includes('DB_')
+    );
+    const result = {};
+    keys.forEach(k => { result[k] = process.env[k] ? '✓ ada' : 'kosong'; });
+    return res.json(result);
+  }
+
+  // step=sql : jalankan SQL langsung via pg
+  if (step === 'sql') {
+    const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL;
+    if (!dbUrl) return res.json({ error: 'Tidak ada DATABASE_URL / POSTGRES_URL di env vars' });
+
+    const { Client } = require('pg');
+    const client = new Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
     try {
-      const batches = await sbFetch('upload_batches?select=id,store_name&store_name=not.is.null&domain=eq.marketplace&limit=20');
-      let fixed = 0;
-      for (const batch of batches) {
-        await sbFetch(
-          `marketplace_orders?upload_batch_id=eq.${encodeURIComponent(batch.id)}&store_name=is.null`,
-          { method: 'PATCH', body: JSON.stringify({ store_name: batch.store_name }) }
-        );
-        fixed++;
+      await client.connect();
+      const sqls = [
+        `UPDATE marketplace_orders SET status_resi_detail = NULL WHERE status_resi = 'SAMPAI' AND status_resi_detail IS NOT NULL`,
+        `UPDATE akuisisi_orders SET status_resi_detail = NULL WHERE status_resi = 'SAMPAI' AND status_resi_detail IS NOT NULL`,
+        `UPDATE crm_orders SET status_resi_detail = NULL WHERE status_resi = 'SAMPAI' AND status_resi_detail IS NOT NULL`,
+        `UPDATE marketplace_orders mo SET store_name = ub.store_name FROM upload_batches ub WHERE mo.upload_batch_id = ub.id AND mo.store_name IS NULL AND ub.store_name IS NOT NULL`,
+      ];
+      const results = [];
+      for (const sql of sqls) {
+        const r = await client.query(sql);
+        results.push({ sql: sql.slice(0, 50), rowCount: r.rowCount });
       }
-      return res.json({ ok: true, step: 1, result: `${fixed} batches processed` });
+      await client.end();
+      return res.json({ ok: true, results });
     } catch (e) {
-      return res.json({ ok: false, step: 1, error: e.message });
+      await client.end().catch(() => {});
+      return res.json({ ok: false, error: e.message });
     }
   }
 
-  // step=2/3/4 : clear status_resi_detail per 50 rows sekali panggil
-  const tableMap = { '2': 'marketplace_orders', '3': 'akuisisi_orders', '4': 'crm_orders' };
-  const table = tableMap[step];
-  if (table) {
-    try {
-      // Fetch 50 ID dulu
-      const rows = await sbFetch(`${table}?select=id&status_resi=eq.SAMPAI&status_resi_detail=not.is.null&limit=50`);
-      if (rows.length === 0) {
-        return res.json({ ok: true, step, table, result: 'semua sudah bersih!', done: true });
-      }
-      // Update by ID (cepat, pakai index)
-      const ids = rows.map(r => r.id).join(',');
-      await sbFetch(
-        `${table}?id=in.(${ids})`,
-        { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
-      );
-      return res.json({ ok: true, step, table, cleared: rows.length, done: false, msg: 'panggil lagi sampai done: true' });
-    } catch (e) {
-      return res.json({ ok: false, step, table, error: e.message });
-    }
-  }
-
-  res.json({ usage: '?step=1 (fix store_name) | ?step=2 (marketplace) | ?step=3 (akuisisi) | ?step=4 (crm)' });
+  res.json({ usage: '?step=env (cek env vars) | ?step=sql (jalankan SQL)' });
 };
