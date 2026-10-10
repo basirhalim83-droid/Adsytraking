@@ -231,23 +231,27 @@ body {
 
 /* ── Sub-filter On Proses ──────────────────────────────────────────────────── */
 .tr-sub-grid {
-  display: flex; gap: 10px; margin-bottom: 16px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
 }
 .tr-sub-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: var(--card); border: 1.5px solid var(--border); border-radius: 10px;
-  padding: 10px 16px; min-width: 90px; cursor: pointer; gap: 2px;
+  background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius);
+  padding: 14px 10px; cursor: pointer; gap: 4px;
+  box-shadow: var(--shadow);
   transition: all .18s; user-select: none;
 }
-.tr-sub-card:hover { border-color: var(--primary); background: rgba(67,97,238,.05); transform: translateY(-1px); }
-.tr-sub-card.active { border-color: var(--primary); background: rgba(67,97,238,.1); }
+.tr-sub-card:hover { border-color: var(--primary); background: rgba(67,97,238,.05); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+.tr-sub-card.active { border-color: var(--primary); background: rgba(67,97,238,.08); }
 .tr-sub-card.active .tr-sub-count { color: var(--primary); }
 .tr-sub-card.active .tr-sub-label { color: var(--primary); font-weight: 600; }
-.tr-sub-icon  { font-size: 1.1rem; line-height: 1; }
-.tr-sub-count { font-size: 1.2rem; font-weight: 800; color: var(--text-1); line-height: 1.2; }
-.tr-sub-label { font-size: .68rem; font-weight: 500; color: var(--text-3); text-align: center; }
+.tr-sub-icon  { font-size: 1.3rem; line-height: 1; margin-bottom: 2px; }
+.tr-sub-count { font-size: 1.35rem; font-weight: 800; color: var(--text-1); line-height: 1.1; }
+.tr-sub-label { font-size: .7rem; font-weight: 500; color: var(--text-3); text-align: center; white-space: nowrap; }
 [data-theme="dark"] .tr-sub-card.active { background: rgba(67,97,238,.15); }
+@media (max-width: 768px) { .tr-sub-grid { grid-template-columns: repeat(3, 1fr); } }
 
 /* ── Badges ───────────────────────────────────────────────────────────────── */
 .badge {
