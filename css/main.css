@@ -241,6 +241,7 @@ body {
 .badge-warning { background: rgba(255,183,3,.18);  color: #8A6400; }
 .badge-danger  { background: rgba(239,35,60,.12);  color: #C0002E; }
 .badge-gray    { background: rgba(0,0,0,.07);      color: #555; }
+.badge-orange  { background: rgba(255,140,0,.15);  color: #B85000; }
 .badge-primary { background: rgba(67,97,238,.12);  color: var(--primary); }
 [data-theme="dark"] .badge-shopee  { background: rgba(238,77,45,.2); color: #F87171; }
 [data-theme="dark"] .badge-lazada  { background: rgba(67,97,238,.2); color: #93C5FD; }
@@ -248,6 +249,7 @@ body {
 [data-theme="dark"] .badge-success { background: rgba(6,194,112,.2); color: #4ADE80; }
 [data-theme="dark"] .badge-warning { background: rgba(255,183,3,.2); color: #FCD34D; }
 [data-theme="dark"] .badge-danger  { background: rgba(239,35,60,.2); color: #FC8181; }
+[data-theme="dark"] .badge-orange  { background: rgba(255,140,0,.2); color: #FBA94C; }
 [data-theme="dark"] .badge-primary { background: rgba(67,97,238,.2); color: #93C5FD; }
 
 /* ── Tables ───────────────────────────────────────────────────────────────── */
