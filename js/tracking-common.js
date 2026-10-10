@@ -344,8 +344,7 @@ function initTrackingPage(cfg) {
       </div>
     `;
     renderTabs();
-    updateStats();
-    applyFilter();
+    applyFilter(); // updateStats() dipanggil di dalam applyFilter
   }
 
   function renderTabs() {
@@ -357,15 +356,16 @@ function initTrackingPage(cfg) {
     });
   }
 
-  function updateStats() {
+  // baseList = orders sudah difilter produk/CS/ekspedisi/store/search (belum filter stage)
+  function updateStats(baseList) {
     const counts = { ON_PROSES: 0, UNDEL: 0, RETUR: 0, DELIVERY: 0 };
     const stageCounts = {};
-    st.orders.forEach(o => {
+    baseList.forEach(o => {
       const s = trEffectiveStage(o);
       counts[trCardState(s)]++;
       stageCounts[s] = (stageCounts[s] || 0) + 1;
     });
-    const total = st.orders.length;
+    const total = baseList.length;
     const pct = (n) => total > 0 ? (n / total * 100).toFixed(1) + '%' : '';
     document.getElementById('trStatTotal').textContent         = total;
     document.getElementById('trStatOnProses').textContent      = counts.ON_PROSES;
@@ -426,17 +426,26 @@ function initTrackingPage(cfg) {
 
   function applyFilter() {
     const q = (document.getElementById('trSearch').value || '').toLowerCase();
-    const list = st.orders.filter(o => {
-      const stage = trEffectiveStage(o);
-      if (st.filterStage === 'ON_PROSES_GROUP') {
-        if (!TR_ON_PROSES_STAGES.includes(stage)) return false;
-        if (st.subFilter && stage !== st.subFilter) return false;
-      } else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
+
+    // Base list: filter produk/CS/ekspedisi/store/search — TANPA stage filter
+    // Ini yang dipakai updateStats() supaya stat cards ikut filter aktif
+    const baseList = st.orders.filter(o => {
       if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
       if (st.csFilter && o.cs_nama !== st.csFilter) return false;
       if (st.produkFilter && o.produk !== st.produkFilter) return false;
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
+      return true;
+    });
+    updateStats(baseList);
+
+    // List tampilan: base list + stage filter
+    const list = baseList.filter(o => {
+      const stage = trEffectiveStage(o);
+      if (st.filterStage === 'ON_PROSES_GROUP') {
+        if (!TR_ON_PROSES_STAGES.includes(stage)) return false;
+        if (st.subFilter && stage !== st.subFilter) return false;
+      } else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
       return true;
     });
     // Tab Bermasalah: otomatis urutin yang paling belum ditindak duluan (percobaan/direspon/
