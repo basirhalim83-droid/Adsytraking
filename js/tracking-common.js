@@ -114,6 +114,7 @@ function initTrackingPage(cfg) {
   const st = {
     orders: [],
     filterStage: 'SEMUA',
+    subFilter: null,   // sub-filter aktif saat ON_PROSES_GROUP, misal 'DIKIRIM'
     modalId: null,
     mpFilter: '',
     storeFilter: '',
@@ -268,6 +269,7 @@ function initTrackingPage(cfg) {
           <div class="stat-icon">✅</div>
         </div>
       </div>
+      <div id="trSubFilter"></div>
       <div class="card">
         <div class="card-header">
           <div class="card-header-left"><h3>Tracking Resi ${cfg.domainLabel}</h3><div class="card-sub">Monitor status pengiriman &nbsp;·&nbsp; <span id="trLastUpdated" style="color:var(--text-3);font-size:11px">${st.lastUpdated ? 'diperbarui ' + fmtLastUpdated(st.lastUpdated) : ''}</span></div></div>
@@ -357,7 +359,12 @@ function initTrackingPage(cfg) {
 
   function updateStats() {
     const counts = { ON_PROSES: 0, UNDEL: 0, RETUR: 0, DELIVERY: 0 };
-    st.orders.forEach(o => { counts[trCardState(trEffectiveStage(o))]++; });
+    const stageCounts = {};
+    st.orders.forEach(o => {
+      const s = trEffectiveStage(o);
+      counts[trCardState(s)]++;
+      stageCounts[s] = (stageCounts[s] || 0) + 1;
+    });
     const total = st.orders.length;
     const pct = (n) => total > 0 ? (n / total * 100).toFixed(1) + '%' : '';
     document.getElementById('trStatTotal').textContent         = total;
@@ -369,9 +376,48 @@ function initTrackingPage(cfg) {
     document.getElementById('trStatRetur-pct').textContent     = pct(counts.RETUR);
     document.getElementById('trStatDelivery').textContent      = counts.DELIVERY;
     document.getElementById('trStatDelivery-pct').textContent  = pct(counts.DELIVERY);
+    renderSubFilter(stageCounts);
   }
 
-  window.trSetFilter = (key) => { st.filterStage = key; st.page = 1; renderTabs(); applyFilter(); };
+  const SUB_FILTER_STAGES = [
+    { key: 'MENUNGGU_RESI', icon: '⏳' },
+    { key: 'BELUM_DICEK',   icon: '🔍' },
+    { key: 'MANUAL',        icon: '🔧' },
+    { key: 'DIKIRIM',       icon: '🚚' },
+    { key: 'KOTA_TUJUAN',   icon: '🏙️' },
+    { key: 'OTW',           icon: '🛵' },
+  ];
+
+  function renderSubFilter(stageCounts) {
+    const el = document.getElementById('trSubFilter');
+    if (!el) return;
+    if (st.filterStage !== 'ON_PROSES_GROUP') { el.innerHTML = ''; return; }
+
+    const items = SUB_FILTER_STAGES.map(({ key, icon }) => {
+      const count = stageCounts[key] || 0;
+      const meta  = TR_STAGE_META[key];
+      const label = meta.label.replace(/^\S+\s*/, ''); // strip emoji dari meta
+      const isActive = st.subFilter === key;
+      return `
+        <div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="trSetSubFilter('${key}')">
+          <div class="tr-sub-icon">${icon}</div>
+          <div class="tr-sub-count">${count}</div>
+          <div class="tr-sub-label">${label}</div>
+        </div>`;
+    });
+
+    el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
+  }
+
+  window.trSetFilter = (key) => { st.filterStage = key; st.subFilter = null; st.page = 1; renderTabs(); applyFilter(); };
+  window.trSetSubFilter = (key) => {
+    // toggle: klik lagi = deselect
+    st.subFilter = st.subFilter === key ? null : key;
+    st.page = 1;
+    // update active state sub-cards
+    document.querySelectorAll('.tr-sub-card').forEach(el => el.classList.toggle('active', el.getAttribute('onclick') === `trSetSubFilter('${st.subFilter}')`));
+    applyFilter();
+  };
   window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; st.page = 1; load(); };
   window.trSetStoreFilter = (val) => { st.storeFilter = val; st.page = 1; applyFilter(); };
   window.trSetEkspedisiFilter = (val) => { st.ekspedisiFilter = val; st.page = 1; applyFilter(); };
@@ -382,8 +428,10 @@ function initTrackingPage(cfg) {
     const q = (document.getElementById('trSearch').value || '').toLowerCase();
     const list = st.orders.filter(o => {
       const stage = trEffectiveStage(o);
-      if (st.filterStage === 'ON_PROSES_GROUP') { if (!TR_ON_PROSES_STAGES.includes(stage)) return false; }
-      else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
+      if (st.filterStage === 'ON_PROSES_GROUP') {
+        if (!TR_ON_PROSES_STAGES.includes(stage)) return false;
+        if (st.subFilter && stage !== st.subFilter) return false;
+      } else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
       if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
       if (st.csFilter && o.cs_nama !== st.csFilter) return false;
