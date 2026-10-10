@@ -193,8 +193,20 @@ function initTrackingPage(cfg) {
     renderDrp();
   };
 
-  async function load() {
-    showLoading();
+  function fmtLastUpdated(d) {
+    if (!d) return '';
+    const h = String(d.getHours()).padStart(2,'0');
+    const m = String(d.getMinutes()).padStart(2,'0');
+    const s = String(d.getSeconds()).padStart(2,'0');
+    return `${h}:${m}:${s}`;
+  }
+  function setLastUpdatedIndicator() {
+    const el = document.getElementById('trLastUpdated');
+    if (el) el.textContent = `diperbarui ${fmtLastUpdated(st.lastUpdated)}`;
+  }
+
+  async function load(silent = false) {
+    if (!silent) showLoading();
     try {
       const filters = { dateFrom: trYmd(st.filterStart), dateTo: trYmd(st.filterEnd) };
       if (cfg.hasMarketplaceFilter && st.mpFilter) filters.marketplace = st.mpFilter;
@@ -202,9 +214,11 @@ function initTrackingPage(cfg) {
       if (cfg.hasMarketplaceFilter && typeof dbGetStores === 'function') {
         st.storeOptions = await dbGetStores(st.mpFilter || undefined);
       }
+      st.lastUpdated = new Date();
       renderPage();
+      setLastUpdatedIndicator();
     } catch (e) {
-      showError('Gagal memuat data tracking: ' + e.message);
+      if (!silent) showError('Gagal memuat data tracking: ' + e.message);
     }
   }
 
@@ -244,7 +258,7 @@ function initTrackingPage(cfg) {
       </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-header-left"><h3>Tracking Resi ${cfg.domainLabel}</h3><div class="card-sub">Monitor status pengiriman</div></div>
+          <div class="card-header-left"><h3>Tracking Resi ${cfg.domainLabel}</h3><div class="card-sub">Monitor status pengiriman &nbsp;·&nbsp; <span id="trLastUpdated" style="color:var(--text-3);font-size:11px">${st.lastUpdated ? 'diperbarui ' + fmtLastUpdated(st.lastUpdated) : ''}</span></div></div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             ${cfg.hasMarketplaceFilter ? `
               <select class="ctrl-select" id="trMpFilter" onchange="trSetMpFilter(this.value)">
@@ -593,6 +607,9 @@ function initTrackingPage(cfg) {
   window.trReload = load; // dipanggil upload-common.js abis upload sukses, biar list ke-refresh
 
   load();
+
+  // Auto-refresh tiap 60 detik secara silent (tanpa loading spinner)
+  setInterval(() => load(true), 60 * 1000);
 }
 
 function ensureModal() {
