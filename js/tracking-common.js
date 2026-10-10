@@ -681,7 +681,7 @@ function initTrackingPage(cfg) {
     if (!o) return;
     try {
       const data = await checkOne(o);
-      updateStats(); applyFilter();
+      applyFilter();
       window.trOpenDetail(st.modalId);
       showToast('✅ Status diperbarui: ' + (TR_STAGE_META[data.stage]?.label || data.stage), 'success');
     } catch (e) {
@@ -707,7 +707,7 @@ function initTrackingPage(cfg) {
     }
     btn.disabled = false;
     btn.textContent = '🔄 Refresh Semua';
-    updateStats(); applyFilter();
+    applyFilter();
     showToast('✅ Selesai cek semua resi', 'success');
   };
 
