@@ -491,6 +491,14 @@ function initTrackingPage(cfg) {
       const followupScore = o => (o.followup_attempts || 0) + (o.followup_responded ? 1 : 0) + (o.followup_courier_notified ? 1 : 0);
       list.sort((a, b) => followupScore(a) - followupScore(b));
     }
+    // Tab BELUM_DICEK (langsung atau via sub-filter On Proses): resi yang format-nya
+    // mencurigakan (order ID Mengantar, salah ekspedisi, dll) naik ke paling atas
+    // supaya CS langsung tahu mana yang perlu dikoreksi.
+    const isBelumDicekView = st.filterStage === 'BELUM_DICEK' ||
+      (st.filterStage === 'ON_PROSES_GROUP' && st.subFilter === 'BELUM_DICEK');
+    if (isBelumDicekView) {
+      list.sort((a, b) => (trGetResiHint(a) ? 0 : 1) - (trGetResiHint(b) ? 0 : 1));
+    }
     st.filteredList = list; // simpan full list untuk Excel export
 
     const totalPages = Math.max(1, Math.ceil(list.length / st.pageSize));
