@@ -15,28 +15,47 @@ module.exports = async function handler(req, res) {
     let fixed1 = 0;
     for (const batch of batches) {
       await sbFetch(
-        `marketplace_orders?upload_batch_id=eq.${batch.id}&store_name=is.null`,
+        `marketplace_orders?upload_batch_id=eq.${encodeURIComponent(batch.id)}&store_name=is.null`,
         { method: 'PATCH', body: JSON.stringify({ store_name: batch.store_name }) }
       );
       fixed1++;
     }
-    results.fix_store_name = `${batches.length} batches processed`;
+    results.fix_store_name = `${fixed1} batches processed`;
   } catch (e) {
     results.fix_store_name = `ERROR: ${e.message}`;
   }
 
-  // SQL 2: Clear status_resi_detail order yang sudah SAMPAI (semua kurir, bukan hanya SPX)
+  // SQL 2: Clear status_resi_detail order yang sudah SAMPAI — bulk sekaligus
   try {
-    const rows = await sbFetch('marketplace_orders?select=id&status_resi=eq.SAMPAI&status_resi_detail=not.is.null&limit=500');
-    for (const row of rows) {
-      await sbFetch(
-        `marketplace_orders?id=eq.${row.id}`,
-        { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
-      );
-    }
-    results.clear_detail = `${rows.length} rows cleared`;
+    await sbFetch(
+      'marketplace_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
+      { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
+    );
+    results.clear_detail = 'done (bulk update)';
   } catch (e) {
     results.clear_detail = `ERROR: ${e.message}`;
+  }
+
+  // SQL 2b: akuisisi_orders juga
+  try {
+    await sbFetch(
+      'akuisisi_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
+      { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
+    );
+    results.clear_detail_akuisisi = 'done (bulk update)';
+  } catch (e) {
+    results.clear_detail_akuisisi = `ERROR: ${e.message}`;
+  }
+
+  // SQL 2c: crm_orders juga
+  try {
+    await sbFetch(
+      'crm_orders?status_resi=eq.SAMPAI&status_resi_detail=not.is.null',
+      { method: 'PATCH', body: JSON.stringify({ status_resi_detail: null }) }
+    );
+    results.clear_detail_crm = 'done (bulk update)';
+  } catch (e) {
+    results.clear_detail_crm = `ERROR: ${e.message}`;
   }
 
   res.json({ ok: true, results });
