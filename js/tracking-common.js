@@ -65,6 +65,41 @@ function trStepperHtml(stage) {
   }).join('')}</div>`;
 }
 
+// ── Deteksi format resi mencurigakan (tampil sebagai hint di modal) ────────────
+function trGetResiHint(o) {
+  const id  = String(o.id || '');
+  const exp = String(o.ekspedisi || '').toLowerCase();
+
+  // 26MNG* → Mengantar order ID, bukan resi pengiriman
+  if (/^26MNG/i.test(id)) {
+    return {
+      title: 'Bukan Nomor Resi',
+      body: `<strong>${escapeHtml(id)}</strong> adalah <strong>order ID Mengantar</strong>, bukan nomor resi pengiriman. Minta CS untuk input nomor resi yang benar dari dashboard Mengantar.`,
+    };
+  }
+
+  // JJ* atau C1* → format J&T, tapi ekspedisi bukan J&T
+  const isJtFormat = /^JJ/i.test(id) || /^C1/i.test(id);
+  const isJt = /j&t|jnt|jet/i.test(exp);
+  if (isJtFormat && !isJt) {
+    const ekspLabel = o.ekspedisi ? `<strong>${escapeHtml(o.ekspedisi)}</strong>` : 'tidak tercatat';
+    return {
+      title: 'Kemungkinan Salah Ekspedisi',
+      body: `Format resi <strong>${escapeHtml(id)}</strong> seperti <strong>J&T Express</strong>, tapi ekspedisi tercatat sebagai ${ekspLabel}. Kemungkinan salah pilih ekspedisi saat input — minta CS koreksi.`,
+    };
+  }
+
+  // JJ* dengan ekspedisi J&T tapi masih gagal → resi tidak ditemukan biasa
+  if (isJtFormat && isJt) {
+    return {
+      title: 'Nomor Resi Tidak Ditemukan',
+      body: `Resi <strong>${escapeHtml(id)}</strong> belum terdaftar di sistem J&T Express. Kemungkinan paket belum di-scan pertama kali oleh kurir. Coba cek ulang dalam beberapa jam.`,
+    };
+  }
+
+  return null;
+}
+
 // ── Date range picker (dropdown + kalender, default Bulan Ini) ─────────────────
 const DRP_MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const DRP_DAYS   = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
@@ -602,10 +637,18 @@ function initTrackingPage(cfg) {
         <a href="https://autolaris.com/lacak-paket" target="_blank" style="display:inline-block;margin-top:8px;font-size:.78rem;color:var(--primary);text-decoration:none;font-weight:600">🔗 Cek di Autolaris →</a>
       </div>
     ` : '';
+    const resiHint = trGetResiHint(o);
+    const resiHintHtml = resiHint ? `
+      <div style="margin-top:14px;padding:12px 14px;border-radius:10px;background:rgba(239,35,60,.06);border:1px solid rgba(239,35,60,.2)">
+        <div style="font-weight:700;font-size:.82rem;margin-bottom:4px">⚠️ ${escapeHtml(resiHint.title)}</div>
+        <div style="font-size:.78rem;color:var(--text-2);line-height:1.6">${resiHint.body}</div>
+      </div>
+    ` : '';
     document.getElementById('trkModalBody').innerHTML = `
       <div style="margin-top:10px"><span class="badge ${meta.badge}">${meta.label}</span></div>
       ${stage !== 'MANUAL' ? trStepperHtml(stage) : ''}
       ${manualHtml}
+      ${resiHintHtml}
       ${followupHtml}
       ${historyHtml}
     `;
