@@ -246,16 +246,24 @@ function initTrackingPage(cfg) {
           <div class="stat-label">Total</div><div class="stat-value" id="trStatTotal">0</div><div class="stat-icon">📦</div>
         </div>
         <div class="stat-card clickable" id="trStatCard-ON_PROSES" onclick="trSetFilter('ON_PROSES_GROUP')">
-          <div class="stat-label">On Proses</div><div class="stat-value" id="trStatOnProses" style="color:var(--primary)">0</div><div class="stat-icon">🔄</div>
+          <div class="stat-label">On Proses</div><div class="stat-value" id="trStatOnProses" style="color:var(--primary)">0</div>
+          <div id="trStatOnProses-pct" style="font-size:.72rem;color:var(--primary);opacity:.75;margin-top:2px"></div>
+          <div class="stat-icon">🔄</div>
         </div>
         <div class="stat-card clickable" id="trStatCard-UNDEL" onclick="trSetFilter('BERMASALAH')">
-          <div class="stat-label">Bermasalah</div><div class="stat-value" id="trStatUndel" style="color:var(--danger)">0</div><div class="stat-icon">⚠️</div>
+          <div class="stat-label">Bermasalah</div><div class="stat-value" id="trStatUndel" style="color:var(--danger)">0</div>
+          <div id="trStatUndel-pct" style="font-size:.72rem;color:var(--danger);opacity:.75;margin-top:2px"></div>
+          <div class="stat-icon">⚠️</div>
         </div>
         <div class="stat-card clickable" id="trStatCard-RETUR" onclick="trSetFilter('RETUR')">
-          <div class="stat-label">Retur</div><div class="stat-value" id="trStatRetur" style="color:var(--danger)">0</div><div class="stat-icon">↩️</div>
+          <div class="stat-label">Retur</div><div class="stat-value" id="trStatRetur" style="color:var(--danger)">0</div>
+          <div id="trStatRetur-pct" style="font-size:.72rem;color:var(--danger);opacity:.75;margin-top:2px"></div>
+          <div class="stat-icon">↩️</div>
         </div>
         <div class="stat-card clickable" id="trStatCard-DELIVERY" onclick="trSetFilter('SAMPAI')">
-          <div class="stat-label">Terkirim</div><div class="stat-value" id="trStatDelivery" style="color:var(--success)">0</div><div class="stat-icon">✅</div>
+          <div class="stat-label">Terkirim</div><div class="stat-value" id="trStatDelivery" style="color:var(--success)">0</div>
+          <div id="trStatDelivery-pct" style="font-size:.72rem;color:var(--success);opacity:.75;margin-top:2px"></div>
+          <div class="stat-icon">✅</div>
         </div>
       </div>
       <div class="card">
@@ -348,11 +356,17 @@ function initTrackingPage(cfg) {
   function updateStats() {
     const counts = { ON_PROSES: 0, UNDEL: 0, RETUR: 0, DELIVERY: 0 };
     st.orders.forEach(o => { counts[trCardState(trEffectiveStage(o))]++; });
-    document.getElementById('trStatTotal').textContent    = st.orders.length;
-    document.getElementById('trStatOnProses').textContent = counts.ON_PROSES;
-    document.getElementById('trStatUndel').textContent    = counts.UNDEL;
-    document.getElementById('trStatRetur').textContent    = counts.RETUR;
-    document.getElementById('trStatDelivery').textContent = counts.DELIVERY;
+    const total = st.orders.length;
+    const pct = (n) => total > 0 ? (n / total * 100).toFixed(1) + '%' : '';
+    document.getElementById('trStatTotal').textContent         = total;
+    document.getElementById('trStatOnProses').textContent      = counts.ON_PROSES;
+    document.getElementById('trStatOnProses-pct').textContent  = pct(counts.ON_PROSES);
+    document.getElementById('trStatUndel').textContent         = counts.UNDEL;
+    document.getElementById('trStatUndel-pct').textContent     = pct(counts.UNDEL);
+    document.getElementById('trStatRetur').textContent         = counts.RETUR;
+    document.getElementById('trStatRetur-pct').textContent     = pct(counts.RETUR);
+    document.getElementById('trStatDelivery').textContent      = counts.DELIVERY;
+    document.getElementById('trStatDelivery-pct').textContent  = pct(counts.DELIVERY);
   }
 
   window.trSetFilter = (key) => { st.filterStage = key; st.page = 1; renderTabs(); applyFilter(); };
