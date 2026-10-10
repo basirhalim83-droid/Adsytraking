@@ -10,6 +10,7 @@ const TR_STEP_LABELS = ['Konfirmasi', 'Dikirim', 'Kota Tujuan', 'OTW', 'Sampai']
 const TR_STAGE_META = {
   MENUNGGU_RESI: { label: '⏳ Menunggu Resi', badge: 'badge-warning', step: 1 },
   BELUM_DICEK:   { label: '🔍 Belum Dicek',   badge: 'badge-gray',    step: 1 },
+  MANUAL:        { label: '🔧 Cek Manual',    badge: 'badge-orange',  step: 1 },
   DIKIRIM:       { label: '🚚 Dikirim',        badge: 'badge-primary', step: 2 },
   KOTA_TUJUAN:   { label: '🏙️ Kota Tujuan',   badge: 'badge-primary', step: 3 },
   OTW:           { label: '🛵 OTW',            badge: 'badge-warning', step: 4 },
@@ -20,6 +21,7 @@ const TR_STAGE_META = {
 const TR_TABS = [
   { key: 'SEMUA',         label: 'Semua' },
   { key: 'MENUNGGU_RESI', label: '⏳ Menunggu Resi' },
+  { key: 'MANUAL',        label: '🔧 Cek Manual' },
   { key: 'DIKIRIM',       label: '🚚 Dikirim' },
   { key: 'KOTA_TUJUAN',   label: '🏙️ Kota Tujuan' },
   { key: 'OTW',           label: '🛵 OTW' },
@@ -28,7 +30,7 @@ const TR_TABS = [
   { key: 'RETUR',         label: '↩️ Retur' },
 ];
 const TR_STAT_CARD_FILTER = { SEMUA: 'SEMUA', ON_PROSES: 'ON_PROSES_GROUP', UNDEL: 'BERMASALAH', RETUR: 'RETUR', DELIVERY: 'SAMPAI' };
-const TR_ON_PROSES_STAGES = ['MENUNGGU_RESI', 'BELUM_DICEK', 'DIKIRIM', 'KOTA_TUJUAN', 'OTW'];
+const TR_ON_PROSES_STAGES = ['MENUNGGU_RESI', 'BELUM_DICEK', 'MANUAL', 'DIKIRIM', 'KOTA_TUJUAN', 'OTW'];
 const TR_AVATAR_PALETTE = ['#4361EE', '#7B2FBE', '#06C270', '#FFB703', '#EF233C', '#0EA5E9', '#7C3AED', '#0891B2', '#65A30D', '#C026D3'];
 const MP_BADGE = { shopee: ['badge-shopee', 'Shopee'], tiktok: ['badge-tiktok', 'TikTok'], lazada: ['badge-lazada', 'Lazada'] };
 
@@ -536,9 +538,17 @@ function initTrackingPage(cfg) {
         </label>
       </div>
     ` : '';
+    const manualHtml = stage === 'MANUAL' ? `
+      <div style="margin-top:14px;padding:12px 14px;border-radius:10px;background:rgba(255,140,0,.08);border:1px solid rgba(255,140,0,.25)">
+        <div style="font-weight:700;font-size:.82rem;margin-bottom:6px">🔧 Resi Autolaris (COD JNE)</div>
+        <div style="font-size:.78rem;color:var(--text-2);line-height:1.5">Resi dengan prefix <strong>AK</strong> hanya bisa dilacak via website Autolaris. Sistem tidak bisa cek otomatis karena proteksi reCAPTCHA.</div>
+        <a href="https://autolaris.com/lacak-paket" target="_blank" style="display:inline-block;margin-top:8px;font-size:.78rem;color:var(--primary);text-decoration:none;font-weight:600">🔗 Cek di Autolaris →</a>
+      </div>
+    ` : '';
     document.getElementById('trkModalBody').innerHTML = `
       <div style="margin-top:10px"><span class="badge ${meta.badge}">${meta.label}</span></div>
-      ${trStepperHtml(stage)}
+      ${stage !== 'MANUAL' ? trStepperHtml(stage) : ''}
+      ${manualHtml}
       ${followupHtml}
       ${historyHtml}
     `;
@@ -559,6 +569,8 @@ function initTrackingPage(cfg) {
       // Sync status_resi_detail ke entry di st.orders supaya trManualCheckFromModal tetap jalan
       if (full) Object.assign(o, { status_resi_detail: full.status_resi_detail });
       renderModalBody(o, full?.status_resi_detail);
+      const checkBtn = document.getElementById('trkModalCheckBtn');
+      if (checkBtn) checkBtn.disabled = trEffectiveStage(o) === 'MANUAL';
     } catch (e) {
       document.getElementById('trkModalBody').innerHTML = `<div style="padding:24px;text-align:center;color:var(--danger);font-size:.85rem">Gagal memuat detail: ${escapeHtml(e.message)}</div>`;
     }
@@ -622,7 +634,7 @@ function initTrackingPage(cfg) {
 
   window.trRefreshAll = async () => {
     const btn = document.getElementById('trRefreshBtn');
-    const targets = st.orders.filter(o => o.ekspedisi && !['SAMPAI', 'RETUR'].includes(o.status_resi));
+    const targets = st.orders.filter(o => o.ekspedisi && !['SAMPAI', 'RETUR', 'MANUAL'].includes(o.status_resi));
     if (!targets.length) { showToast('Tidak ada resi yang bisa dicek', 'info'); return; }
     btn.disabled = true;
     let done = 0;
@@ -665,7 +677,7 @@ function ensureModal() {
           <div id="trkModalBody"></div>
           <div style="display:flex;gap:10px;margin-top:18px">
             <button class="btn btn-secondary" style="flex:1" onclick="trCloseModal()">Tutup</button>
-            <button class="btn btn-primary" style="flex:1" onclick="trManualCheckFromModal()">🔄 Cek Ulang</button>
+            <button class="btn btn-primary" style="flex:1" id="trkModalCheckBtn" onclick="trManualCheckFromModal()">🔄 Cek Ulang</button>
           </div>
         </div>
       </div>
