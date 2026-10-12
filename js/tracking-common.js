@@ -35,7 +35,6 @@ const TR_BERMASALAH_KATEGORI_META = {
   ALAMAT_SALAH:         { label: 'Alamat Salah',       icon: '📍' },
   TIDAK_BISA_DIHUBUNGI: { label: 'Tidak Dihubungi',   icon: '📵' },
   DITOLAK:              { label: 'Ditolak',            icon: '🚫' },
-  PINDAH_ALAMAT:        { label: 'Pindah Alamat',      icon: '🏠' },
   SIMPAN_GUDANG:        { label: 'Simpan di Gudang',   icon: '📦' },
   LAINNYA:              { label: 'Lainnya',            icon: '❓' },
 };
