@@ -372,6 +372,8 @@ tr:hover td { background: rgba(67,97,238,.03); }
 .tr-price { font-size: .9rem; font-weight: 800; color: var(--text-1); text-align: right; white-space: nowrap; }
 .tr-date  { font-size: .68rem; color: var(--text-3); text-align: right; margin-top: 2px; white-space: nowrap; }
 .tr-resi  { font-size: .68rem; font-weight: 700; color: var(--text-2); background: var(--input-bg); padding: 3px 9px; border-radius: 6px; margin-top: 6px; display: inline-block; }
+.tr-checked-at { font-size: .65rem; color: var(--text-3); text-align: right; margin-top: 5px; white-space: nowrap; }
+.tr-checked-never { color: var(--danger); opacity: .7; }
 
 .tr-divider { margin-top: 14px; padding-top: 14px; box-shadow: inset 0 1px 0 rgba(0,0,0,.08); }
 [data-theme="dark"] .tr-divider { box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
