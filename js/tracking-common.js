@@ -633,14 +633,31 @@ function initTrackingPage(cfg) {
     const records = detail?.records || [];
     let historyHtml = '<div style="font-size:.78rem;color:var(--text-3);margin-top:12px">Belum ada history — klik "Cek Ulang".</div>';
     if (records.length) {
-      historyHtml = `<div style="margin-top:14px">${records.map((r, i) => `
+      const fmtTs = (ts) => {
+        if (!ts) return '';
+        const d = new Date(ts * 1000);
+        if (isNaN(d)) return '';
+        const now = new Date();
+        const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+        const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        const diffDays = Math.floor((new Date(now.getFullYear(),now.getMonth(),now.getDate()) - new Date(d.getFullYear(),d.getMonth(),d.getDate())) / 86400000);
+        if (diffDays === 0) return `Hari ini ${hm}`;
+        if (diffDays === 1) return `Kemarin ${hm}`;
+        return `${d.getDate()} ${months[d.getMonth()]} ${hm}`;
+      };
+      historyHtml = `<div style="margin-top:14px">${records.map((r, i) => {
+        const ts = fmtTs(r.actual_time);
+        const loc = r.current_location?.location_name;
+        const meta = [ts, loc ? escapeHtml(loc) : ''].filter(Boolean).join(' · ');
+        return `
         <div class="tr-history-item">
           <div class="tr-history-dot" style="background:${i === 0 ? 'var(--primary)' : 'var(--border)'}"></div>
           <div>
             <div style="font-size:.78rem;${i === 0 ? 'font-weight:700' : ''}">${escapeHtml(r.description || r.tracking_name || '-')}</div>
-            <div style="font-size:.68rem;color:var(--text-3);margin-top:2px">${r.actual_time ? new Date(r.actual_time * 1000).toLocaleString('id-ID') : ''}${r.current_location?.location_name ? ' · ' + escapeHtml(r.current_location.location_name) : ''}</div>
+            ${meta ? `<div style="font-size:.68rem;color:var(--text-3);margin-top:2px">${meta}</div>` : ''}
           </div>
-        </div>`).join('')}</div>`;
+        </div>`;
+      }).join('')}</div>`;
     }
     const followupHtml = stage === 'BERMASALAH' ? `
       <div style="margin-top:16px;padding:12px;border-radius:10px;background:var(--bg-2,rgba(0,0,0,.03))">
