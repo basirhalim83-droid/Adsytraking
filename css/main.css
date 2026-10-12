@@ -361,7 +361,7 @@ tr:hover td { background: rgba(67,97,238,.03); }
   display: flex; align-items: center; justify-content: center;
   color: white; font-weight: 800; font-size: .85rem;
 }
-.tr-name { font-size: .85rem; font-weight: 700; color: var(--text-1); }
+.tr-name { font-size: .85rem; font-weight: 700; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tr-sub  { font-size: .72rem; color: var(--text-3); margin-top: 1px; }
 .tr-meta { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
 .tr-produk {
