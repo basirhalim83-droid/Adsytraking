@@ -571,11 +571,13 @@ function initTrackingPage(cfg) {
     const d = new Date(ts);
     if (isNaN(d)) return null;
     const now = new Date();
-    const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
     const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    if (isToday) return hm;
+    const sameYear = d.getFullYear() === now.getFullYear();
+    const diffDays = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    if (diffDays === 0) return `Hari ini, ${hm}`;
+    if (diffDays === 1) return `Kemarin, ${hm}`;
     const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
-    return `${d.getDate()} ${months[d.getMonth()]} ${hm}`;
+    return `${d.getDate()} ${months[d.getMonth()]}${sameYear ? '' : ' ' + d.getFullYear()}, ${hm}`;
   }
 
   function cardHtml(o) {
