@@ -237,8 +237,12 @@ function _parseSimpleOrderRows(rows, mapping, domain, skuMap) {
     const produkFinal = produkFromCol || (bundle && bundle.produk) || namaSku;
     const qtyFromCol = mapping.qty ? _safeParseInt(get(mapping.qty)) : null;
     const qtyFinal = qtyFromCol || (bundle && bundle.qty) || 1;
+    const resiId = _fixSciNotation(get(mapping.id) || ('IMP-' + domain + '-' + i)) || ('IMP-' + domain + '-' + i);
+    let ekspedisi = _normalizeEkspedisi(ekspedisiRaw);
+    // MGT* = SAP Express, override kalau ekspedisi tidak terdeteksi
+    if (!ekspedisi && /^MGT\d/i.test(resiId)) ekspedisi = 'SAP';
     return {
-      id: _fixSciNotation(get(mapping.id) || ('IMP-' + domain + '-' + i)) || ('IMP-' + domain + '-' + i),
+      id: resiId,
       order_date: _parseDate(rawDate),
       nama: namaClean,
       hp: _fixSciNotation(get(mapping.hp)),
@@ -247,7 +251,7 @@ function _parseSimpleOrderRows(rows, mapping, domain, skuMap) {
       produk: produkFinal,
       qty: qtyFinal,
       total: _parsePrice(get(mapping.total)),
-      ekspedisi: _normalizeEkspedisi(ekspedisiRaw),
+      ekspedisi,
       cs_nama: extractCsName(get(mapping.instruksi)),
     };
   }).filter(r => r.id && r.id.trim());

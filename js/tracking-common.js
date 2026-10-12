@@ -688,7 +688,7 @@ function initTrackingPage(cfg) {
         <div style="font-size:.78rem;color:var(--text-2);line-height:1.6">${resiHint.body}</div>
       </div>
     ` : '';
-    const EKSPEDISI_LIST = ['JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION','POS','SPX'];
+    const EKSPEDISI_LIST = ['JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION','POS','SPX','SAP'];
     const ekspedisiHtml = `
       <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-size:.78rem;color:var(--text-3);white-space:nowrap">Ekspedisi:</span>
