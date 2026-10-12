@@ -366,8 +366,7 @@ tr:hover td { background: rgba(67,97,238,.03); }
 .tr-meta { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
 .tr-produk {
   font-size: .75rem; color: var(--text-2); margin-top: 6px;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tr-price { font-size: .9rem; font-weight: 800; color: var(--text-1); text-align: right; white-space: nowrap; }
 .tr-date  { font-size: .68rem; color: var(--text-3); text-align: right; margin-top: 2px; white-space: nowrap; }
