@@ -603,7 +603,7 @@ function initTrackingPage(cfg) {
       <div class="tr-card-top">
         <div class="tr-card-left">
           <div class="tr-avatar" style="background:${trAvatarColor(name)}">${initial}</div>
-          <div style="min-width:0;flex:1">
+          <div style="min-width:0">
             <div class="tr-name">${escapeHtml(name)}</div>
             <div class="tr-sub">${escapeHtml(sub)}</div>
             <div class="tr-meta">
