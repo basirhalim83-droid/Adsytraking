@@ -566,6 +566,18 @@ function initTrackingPage(cfg) {
     showToast(`✅ ${rows.length} data diexport`, 'success');
   };
 
+  function fmtCheckedAt(ts) {
+    if (!ts) return null;
+    const d = new Date(ts);
+    if (isNaN(d)) return null;
+    const now = new Date();
+    const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    if (isToday) return hm;
+    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${hm}`;
+  }
+
   function cardHtml(o) {
     const stage = trEffectiveStage(o);
     const meta  = TR_STAGE_META[stage] || TR_STAGE_META.BELUM_DICEK;
@@ -580,6 +592,10 @@ function initTrackingPage(cfg) {
       o.followup_responded ? `<span class="badge badge-success">✅ Sudah Direspon</span>` : '',
       o.followup_courier_notified ? `<span class="badge badge-success">📦 Sudah Hubungi Kurir</span>` : '',
     ].join('') : '';
+    const checkedAt = fmtCheckedAt(o.status_resi_updated_at);
+    const checkedLabel = checkedAt
+      ? `<div class="tr-checked-at">🕐 Dicek: ${checkedAt}</div>`
+      : (stage === 'BELUM_DICEK' ? `<div class="tr-checked-at tr-checked-never">Belum pernah dicek</div>` : '');
 
     return `<div class="tr-card" onclick="trOpenDetail('${o.id}')">
       <div class="tr-card-top">
@@ -602,6 +618,7 @@ function initTrackingPage(cfg) {
           <div class="tr-price">${fmtFull(o.total || 0)}</div>
           <div class="tr-date">${o.order_date || '-'}</div>
           ${hasResi ? `<div class="tr-resi">${escapeHtml(o.id)}</div>` : ''}
+          ${checkedLabel}
         </div>
       </div>
       <div class="tr-divider">${trStepperHtml(stage)}</div>
