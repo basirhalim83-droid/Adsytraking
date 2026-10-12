@@ -30,6 +30,15 @@ const TR_TABS = [
   { key: 'RETUR',         label: '↩️ Retur' },
 ];
 const TR_STAT_CARD_FILTER = { SEMUA: 'SEMUA', ON_PROSES: 'ON_PROSES_GROUP', UNDEL: 'BERMASALAH', RETUR: 'RETUR', DELIVERY: 'SAMPAI' };
+const TR_BERMASALAH_KATEGORI_META = {
+  TIDAK_ADA_ORANG:      { label: 'Tidak Ada Orang',   icon: '🚪' },
+  ALAMAT_SALAH:         { label: 'Alamat Salah',       icon: '📍' },
+  TIDAK_BISA_DIHUBUNGI: { label: 'Tidak Dihubungi',   icon: '📵' },
+  DITOLAK:              { label: 'Ditolak',            icon: '🚫' },
+  PINDAH_ALAMAT:        { label: 'Pindah Alamat',      icon: '🏠' },
+  SIMPAN_GUDANG:        { label: 'Simpan di Gudang',   icon: '📦' },
+  LAINNYA:              { label: 'Lainnya',            icon: '❓' },
+};
 const TR_ON_PROSES_STAGES = ['MENUNGGU_RESI', 'BELUM_DICEK', 'MANUAL', 'DIKIRIM', 'KOTA_TUJUAN', 'OTW'];
 const TR_AVATAR_PALETTE = ['#4361EE', '#7B2FBE', '#06C270', '#FFB703', '#EF233C', '#0EA5E9', '#7C3AED', '#0891B2', '#65A30D', '#C026D3'];
 const MP_BADGE = { shopee: ['badge-shopee', 'Shopee'], tiktok: ['badge-tiktok', 'TikTok'], lazada: ['badge-lazada', 'Lazada'] };
@@ -149,7 +158,8 @@ function initTrackingPage(cfg) {
   const st = {
     orders: [],
     filterStage: 'SEMUA',
-    subFilter: null,   // sub-filter aktif saat ON_PROSES_GROUP, misal 'DIKIRIM'
+    subFilter: null,      // sub-filter aktif saat ON_PROSES_GROUP, misal 'DIKIRIM'
+    masalahFilter: null,  // sub-filter aktif saat BERMASALAH, misal 'ALAMAT_SALAH'
     modalId: null,
     mpFilter: '',
     storeFilter: '',
@@ -305,6 +315,7 @@ function initTrackingPage(cfg) {
         </div>
       </div>
       <div id="trSubFilter"></div>
+      <div id="trMasalahSubFilter"></div>
       <div class="card">
         <div class="card-header">
           <div class="card-header-left"><h3>Tracking Resi ${cfg.domainLabel}</h3><div class="card-sub">Monitor status pengiriman &nbsp;·&nbsp; <span id="trLastUpdated" style="color:var(--text-3);font-size:11px">${st.lastUpdated ? 'diperbarui ' + fmtLastUpdated(st.lastUpdated) : ''}</span></div></div>
@@ -412,6 +423,7 @@ function initTrackingPage(cfg) {
     document.getElementById('trStatDelivery').textContent      = counts.DELIVERY;
     document.getElementById('trStatDelivery-pct').textContent  = pct(counts.DELIVERY);
     renderSubFilter(stageCounts);
+    renderMasalahSubFilter();
   }
 
   const SUB_FILTER_STAGES = [
@@ -444,13 +456,64 @@ function initTrackingPage(cfg) {
     el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
   }
 
-  window.trSetFilter = (key) => { st.filterStage = key; st.subFilter = null; st.page = 1; renderTabs(); applyFilter(); };
+  function renderMasalahSubFilter() {
+    const el = document.getElementById('trMasalahSubFilter');
+    if (!el) return;
+    if (st.filterStage !== 'BERMASALAH') { el.innerHTML = ''; return; }
+
+    // Hitung per kategori dari semua order BERMASALAH yang sudah melewati base filter
+    // (tanpa masalah sub-filter supaya count total per kategori tetap kelihatan)
+    const q = (document.getElementById('trSearch')?.value || '').toLowerCase();
+    const bermasalahOrders = st.orders.filter(o => {
+      if (st.storeFilter && o.store_name !== st.storeFilter) return false;
+      if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
+      if (st.csFilter && o.cs_nama !== st.csFilter) return false;
+      if (st.produkFilter && o.produk !== st.produkFilter) return false;
+      if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
+      return trEffectiveStage(o) === 'BERMASALAH';
+    });
+
+    const kategorCounts = {};
+    bermasalahOrders.forEach(o => {
+      const k = o.masalah_kategori || 'LAINNYA';
+      kategorCounts[k] = (kategorCounts[k] || 0) + 1;
+    });
+
+    const items = Object.entries(TR_BERMASALAH_KATEGORI_META).map(([key, meta]) => {
+      const count = kategorCounts[key] || 0;
+      const isActive = st.masalahFilter === key;
+      return `
+        <div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="trClickMasalahSub('${key}')">
+          <div class="tr-sub-icon">${meta.icon}</div>
+          <div class="tr-sub-count">${count}</div>
+          <div class="tr-sub-label">${meta.label}</div>
+        </div>`;
+    });
+
+    el.innerHTML = `<div class="tr-sub-grid">${items.join('')}</div>`;
+  }
+
+  window.trSetFilter = (key) => {
+    st.filterStage = key;
+    st.subFilter = null;
+    st.masalahFilter = null;
+    st.page = 1;
+    renderTabs();
+    applyFilter();
+  };
   window.trSetSubFilter = (key) => {
     // toggle: klik lagi = deselect
     st.subFilter = st.subFilter === key ? null : key;
     st.page = 1;
     // update active state sub-cards
     document.querySelectorAll('.tr-sub-card').forEach(el => el.classList.toggle('active', el.getAttribute('onclick') === `trSetSubFilter('${st.subFilter}')`));
+    applyFilter();
+  };
+  window.trClickMasalahSub = (key) => {
+    // toggle: klik lagi = deselect
+    st.masalahFilter = st.masalahFilter === key ? null : key;
+    st.page = 1;
+    renderMasalahSubFilter();
     applyFilter();
   };
   window.trSetMpFilter = (val) => { st.mpFilter = val; st.storeFilter = ''; st.page = 1; load(); };
@@ -481,6 +544,11 @@ function initTrackingPage(cfg) {
         if (!TR_ON_PROSES_STAGES.includes(stage)) return false;
         if (st.subFilter && stage !== st.subFilter) return false;
       } else if (st.filterStage !== 'SEMUA' && stage !== st.filterStage) return false;
+      // Sub-filter kategori masalah: hanya aktif saat tab BERMASALAH
+      if (st.filterStage === 'BERMASALAH' && st.masalahFilter) {
+        if (!(o.masalah_kategori === st.masalahFilter ||
+              (!o.masalah_kategori && st.masalahFilter === 'LAINNYA'))) return false;
+      }
       return true;
     });
     // Tab Bermasalah: otomatis urutin yang paling belum ditindak duluan (percobaan/direspon/
