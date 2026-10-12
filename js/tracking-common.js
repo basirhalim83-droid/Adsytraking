@@ -688,9 +688,21 @@ function initTrackingPage(cfg) {
         <div style="font-size:.78rem;color:var(--text-2);line-height:1.6">${resiHint.body}</div>
       </div>
     ` : '';
+    const EKSPEDISI_LIST = ['JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION','POS','SPX'];
+    const ekspedisiHtml = `
+      <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:.78rem;color:var(--text-3);white-space:nowrap">Ekspedisi:</span>
+        <select id="trEkspedisiSelect" style="font-size:.78rem;padding:4px 8px;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text-1);flex:1;min-width:120px">
+          <option value="">— Tidak diketahui —</option>
+          ${EKSPEDISI_LIST.map(e => `<option value="${e}" ${o.ekspedisi === e ? 'selected' : ''}>${e}</option>`).join('')}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="trSaveEkspedisi()" style="white-space:nowrap">Simpan</button>
+      </div>
+    `;
     document.getElementById('trkModalBody').innerHTML = `
       <div style="margin-top:10px"><span class="badge ${meta.badge}">${meta.label}</span></div>
       ${stage !== 'MANUAL' ? trStepperHtml(stage) : ''}
+      ${ekspedisiHtml}
       ${manualHtml}
       ${resiHintHtml}
       ${followupHtml}
@@ -743,6 +755,20 @@ function initTrackingPage(cfg) {
       await dbUpdateFollowup(cfg.table, o.id, { [field]: checked });
       o[field] = checked;
       applyFilter();
+    } catch (e) {
+      showToast('❌ ' + e.message, 'error');
+    }
+  };
+
+  window.trSaveEkspedisi = async () => {
+    const o = st.orders.find(x => String(x.id) === String(st.modalId));
+    if (!o) return;
+    const val = document.getElementById('trEkspedisiSelect')?.value || '';
+    try {
+      await dbUpdateFollowup(cfg.table, o.id, { ekspedisi: val || null });
+      o.ekspedisi = val || null;
+      applyFilter();
+      showToast('✅ Ekspedisi disimpan: ' + (val || '—'), 'success');
     } catch (e) {
       showToast('❌ ' + e.message, 'error');
     }
