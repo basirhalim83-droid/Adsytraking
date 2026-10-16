@@ -240,6 +240,7 @@ async function dbDeleteTeamMember(id) {
 // ── Akuisisi: query langsung dari CS Input (real-time, tanpa sync) ────────────
 // Order data diambil dari all_orderan CS Input, tracking status dari akuisisi_orders.
 // Ini menggantikan sync cron VPS yang sebelumnya copy data ke akuisisi_orders.
+const _AUTO_EKSPEDISI = ['SPX','POS','JNE','J&T','SICEPAT','ANTERAJA','NINJA','IDEXPRESS','LION'];
 const _CS_INPUT_URL = 'https://lqpcnzdssvvcayqvdjxs.supabase.co';
 const _CS_INPUT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGNuemRzc3Z2Y2F5cXZkanhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMTgxMDIsImV4cCI6MjA5MDU5NDEwMn0.4M4okAfJWhBD6AbL71utafrFL-ZgbVxcz3ANLnG_jH4';
 
@@ -312,7 +313,17 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
     }
     mapped.forEach(o => {
       const t = trackMap[o.id];
-      if (!t) return;
+      if (!t) {
+        // Tidak ada di akuisisi_orders → cek apakah bisa di-auto-track
+        // AK* resi atau ekspedisi tidak didukung → langsung MANUAL
+        const isAkResi = /^AK/i.test(o.id);
+        const isUnsupportedEksp = o.ekspedisi && !_AUTO_EKSPEDISI.includes(o.ekspedisi);
+        if (isAkResi || isUnsupportedEksp) {
+          o.status_resi = 'MANUAL';
+          o.status_resi_step = 1;
+        }
+        return;
+      }
       o.status_resi            = t.status_resi;
       o.status_resi_step       = t.status_resi_step;
       o.status_resi_updated_at = t.status_resi_updated_at;
