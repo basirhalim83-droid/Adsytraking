@@ -667,7 +667,7 @@ function initTrackingPage(cfg) {
     ].join('') : '';
     const checkedAt = fmtCheckedAt(o.status_resi_updated_at);
     const checkedLabel = checkedAt
-      ? `<div class="tr-checked-at">🕐 Dicek: ${checkedAt}</div>`
+      ? `<div class="tr-checked-at">🕐 Terakhir cek: ${checkedAt}</div>`
       : (stage === 'BELUM_DICEK' ? `<div class="tr-checked-at tr-checked-never">Belum pernah dicek</div>` : '');
 
     return `<div class="tr-card" onclick="trOpenDetail('${o.id}')">
