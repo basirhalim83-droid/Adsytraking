@@ -313,17 +313,7 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
     }
     mapped.forEach(o => {
       const t = trackMap[o.id];
-      if (!t) {
-        // Tidak ada di akuisisi_orders → cek apakah bisa di-auto-track
-        // AK* resi atau ekspedisi tidak didukung → langsung MANUAL
-        const isAkResi = /^AK/i.test(o.id);
-        const isUnsupportedEksp = o.ekspedisi && !_AUTO_EKSPEDISI.includes(o.ekspedisi);
-        if (isAkResi || isUnsupportedEksp) {
-          o.status_resi = 'MANUAL';
-          o.status_resi_step = 1;
-        }
-        return;
-      }
+      if (!t) return;
       o.status_resi            = t.status_resi;
       o.status_resi_step       = t.status_resi_step;
       o.status_resi_updated_at = t.status_resi_updated_at;
@@ -332,6 +322,19 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
       o.followup_courier_notified = t.followup_courier_notified || false;
       o.masalah_kategori       = t.masalah_kategori       || null;
       if (t.ekspedisi) o.ekspedisi = t.ekspedisi; // prefer stored (mungkin sudah diedit manual)
+    });
+
+    // Final pass: order yang ekspedisinya tidak didukung auto-track
+    // → paksa ke MANUAL, meski sudah ada di akuisisi_orders sebagai BELUM_DICEK
+    mapped.forEach(o => {
+      if (!o.status_resi || o.status_resi === 'BELUM_DICEK') {
+        const isAkResi = /^AK/i.test(o.id);
+        const isUnsupportedEksp = o.ekspedisi && !_AUTO_EKSPEDISI.includes(o.ekspedisi);
+        if (isAkResi || isUnsupportedEksp) {
+          o.status_resi = 'MANUAL';
+          o.status_resi_step = 1;
+        }
+      }
     });
   }
 
