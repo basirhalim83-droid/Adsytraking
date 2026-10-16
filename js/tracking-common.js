@@ -259,7 +259,11 @@ function initTrackingPage(cfg) {
     try {
       const filters = { dateFrom: trYmd(st.filterStart), dateTo: trYmd(st.filterEnd) };
       if (cfg.hasMarketplaceFilter && st.mpFilter) filters.marketplace = st.mpFilter;
-      st.orders = await dbGetTrackableOrders(cfg.table, filters);
+      if (cfg.domain === 'akuisisi') {
+        st.orders = await dbGetAkuisisiOrders(filters.dateFrom, filters.dateTo);
+      } else {
+        st.orders = await dbGetTrackableOrders(cfg.table, filters);
+      }
       if (cfg.hasMarketplaceFilter && typeof dbGetStores === 'function') {
         st.storeOptions = await dbGetStores(st.mpFilter || undefined);
       }

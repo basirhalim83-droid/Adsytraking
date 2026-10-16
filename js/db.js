@@ -93,7 +93,10 @@ async function dbGetTrackableOrders(table, filters = {}) {
 // ditarik saat list biasa → hemat egress signifikan.
 async function dbGetOrderDetail(table, id) {
   const { data, error } = await _sb.from(table).select('*').eq('id', id).single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST116') return null; // row not found — order baru belum dicek
+    throw error;
+  }
   return data;
 }
 
@@ -232,6 +235,96 @@ async function dbAddTeamMember(domain, name, noWa) {
 async function dbDeleteTeamMember(id) {
   const { error } = await _sb.from('team_members').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ── Akuisisi: query langsung dari CS Input (real-time, tanpa sync) ────────────
+// Order data diambil dari all_orderan CS Input, tracking status dari akuisisi_orders.
+// Ini menggantikan sync cron VPS yang sebelumnya copy data ke akuisisi_orders.
+const _CS_INPUT_URL = 'https://lqpcnzdssvvcayqvdjxs.supabase.co';
+const _CS_INPUT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxcGNuemRzc3Z2Y2F5cXZkanhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMTgxMDIsImV4cCI6MjA5MDU5NDEwMn0.4M4okAfJWhBD6AbL71utafrFL-ZgbVxcz3ANLnG_jH4';
+
+function _extractEkspedisiCS(pembayaran, resi) {
+  if (resi && /^MGT\d/i.test(String(resi).trim())) return 'SAP';
+  if (!pembayaran) return '';
+  const p = pembayaran.toUpperCase();
+  const map = [['SPX','SPX'],['SICEPAT','SICEPAT'],['ANTERAJA','ANTERAJA'],['IDEXPRESS','IDEXPRESS'],['NINJA','NINJA'],['LION','LION'],['J&T','J&T'],['JNT','J&T'],['JNE','JNE'],['POS','POS'],['SAP','SAP']];
+  for (const [k, v] of map) if (p.includes(k)) return v;
+  return '';
+}
+
+async function dbGetAkuisisiOrders(dateFrom, dateTo) {
+  // 1. Fetch order data langsung dari CS Input all_orderan (real-time)
+  const PAGE = 1000;
+  let csOrders = [], offset = 0;
+  while (true) {
+    const params = [
+      'select=id,tanggal,nama,hp,alamat,jumlah,quantity,total_pembayaran,pembayaran,kabupaten,cs,resi',
+      'sumber=eq.cs_input',
+      'tanggal=gte.' + dateFrom,
+      'tanggal=lte.' + dateTo,
+      'order=tanggal.desc,id.desc',
+      'limit=' + PAGE,
+      'offset=' + offset,
+    ].join('&');
+    const r = await fetch(_CS_INPUT_URL + '/rest/v1/all_orderan?' + params, {
+      headers: { apikey: _CS_INPUT_KEY, Authorization: 'Bearer ' + _CS_INPUT_KEY },
+    });
+    if (!r.ok) throw new Error('CS Input query gagal: ' + r.status);
+    const batch = await r.json();
+    csOrders = csOrders.concat(batch);
+    if (batch.length < PAGE) break;
+    offset += PAGE;
+  }
+
+  // 2. Map ke shape yang sama dengan akuisisi_orders
+  const mapped = csOrders.map(r => {
+    const resiClean = r.resi ? String(r.resi).replace(/^'+/, '').trim() : '';
+    return {
+      id: resiClean || ('IMP-' + r.id),
+      _cs_id: r.id,
+      order_date: r.tanggal,
+      nama: r.nama || '',
+      hp: r.hp || '',
+      alamat: r.alamat || '',
+      produk: r.jumlah || '',
+      qty: r.quantity || 1,
+      total: r.total_pembayaran || 0,
+      ekspedisi: _extractEkspedisiCS(r.pembayaran, resiClean),
+      kota_tujuan: r.kabupaten || '',
+      cs_nama: r.cs || '',
+      status_resi: null, status_resi_step: null, status_resi_updated_at: null,
+      followup_attempts: 0, followup_responded: false, followup_courier_notified: false,
+      masalah_kategori: null,
+    };
+  });
+
+  // 3. Batch query akuisisi_orders untuk tracking status (skip IMP-)
+  const resiIds = mapped.filter(o => !o.id.startsWith('IMP-')).map(o => o.id);
+  if (resiIds.length) {
+    const CHUNK = 500;
+    const trackMap = {};
+    for (let i = 0; i < resiIds.length; i += CHUNK) {
+      const chunk = resiIds.slice(i, i + CHUNK);
+      const { data } = await _sb.from('akuisisi_orders')
+        .select('id,status_resi,status_resi_step,status_resi_updated_at,ekspedisi,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori')
+        .in('id', chunk);
+      (data || []).forEach(t => { trackMap[t.id] = t; });
+    }
+    mapped.forEach(o => {
+      const t = trackMap[o.id];
+      if (!t) return;
+      o.status_resi            = t.status_resi;
+      o.status_resi_step       = t.status_resi_step;
+      o.status_resi_updated_at = t.status_resi_updated_at;
+      o.followup_attempts      = t.followup_attempts      || 0;
+      o.followup_responded     = t.followup_responded     || false;
+      o.followup_courier_notified = t.followup_courier_notified || false;
+      o.masalah_kategori       = t.masalah_kategori       || null;
+      if (t.ekspedisi) o.ekspedisi = t.ekspedisi; // prefer stored (mungkin sudah diedit manual)
+    });
+  }
+
+  return mapped;
 }
 
 // ── Mapping kode SKU -> nama produk (copy manual dari ekosistem ValidasiOrder) ─
