@@ -254,6 +254,29 @@ function _extractEkspedisiCS(pembayaran, resi) {
 }
 
 async function dbGetAkuisisiOrders(dateFrom, dateTo) {
+  // 0. Fetch SKU map dari CS Input (sumber kebenaran -- sama project dengan all_orderan)
+  // Dipakai untuk resolve kode SKU di kolom nama ("BUDI|HRB 1") → nama produk bersih.
+  const _skuMap = new Map();
+  try {
+    const skuRes = await fetch(_CS_INPUT_URL + '/rest/v1/sku_produk?select=kode,nama_produk&limit=500', {
+      headers: { apikey: _CS_INPUT_KEY, Authorization: 'Bearer ' + _CS_INPUT_KEY },
+    });
+    if (skuRes.ok) {
+      const skuData = await skuRes.json();
+      (skuData || []).forEach(s => _skuMap.set(String(s.kode).trim().toUpperCase(), s.nama_produk));
+    }
+  } catch (_) { /* fallback ke jumlah field */ }
+
+  // Resolve produk dari segmen SKU di kolom nama, format: "NAMA PELANGGAN|SKU_BUNDLE|PROMO"
+  // SKU bisa bundle: "HRB 1 MAK 1" = 1x Herbanesia + 1x Maksir → pakai pola sama dgn upload-configs.js
+  function _csSkuToProduk(rawNama) {
+    const sku = (rawNama || '').split('|')[1]?.trim() || '';
+    if (!sku) return '';
+    const tokens = [...sku.matchAll(/([A-Za-z]+)\s*(\d+)/g)];
+    if (!tokens.length) return '';
+    return tokens.map(([, code]) => _skuMap.get(code.toUpperCase()) || code.toUpperCase()).join(' + ');
+  }
+
   // 1. Fetch order data langsung dari CS Input all_orderan (real-time)
   const PAGE = 1000;
   let csOrders = [], offset = 0;
@@ -280,14 +303,16 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
   // 2. Map ke shape yang sama dengan akuisisi_orders
   const mapped = csOrders.map(r => {
     const resiClean = r.resi ? String(r.resi).replace(/^'+/, '').trim() : '';
+    const namaClean = (r.nama || '').split('|')[0].trim() || r.nama || '';
+    const produkFromSku = _csSkuToProduk(r.nama);
     return {
       id: resiClean || ('IMP-' + r.id),
       _cs_id: r.id,
       order_date: r.tanggal,
-      nama: r.nama || '',
+      nama: namaClean,
       hp: r.hp || '',
       alamat: r.alamat || '',
-      produk: r.jumlah || '',
+      produk: produkFromSku || r.jumlah || '',
       qty: r.quantity || 1,
       total: r.total_pembayaran || 0,
       ekspedisi: _extractEkspedisiCS(r.pembayaran, resiClean),
