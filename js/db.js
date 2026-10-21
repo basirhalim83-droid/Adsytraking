@@ -63,9 +63,9 @@ async function dbGetProfile(userId) {
 // select list -- kolom ini bisa puluhan KB per baris dan jadi penyebab utama egress meledak.
 // Fetch status_resi_detail hanya saat buka modal detail 1 order via dbGetOrderDetail().
 // Kolom untuk akuisisi & crm (punya nama/hp/alamat/cs_nama, tidak punya marketplace/sku/buyer/store_name/status)
-const TR_LIST_COLUMNS_DEFAULT = 'id,order_date,nama,hp,alamat,produk,qty,total,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,cs_nama,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori';
+const TR_LIST_COLUMNS_DEFAULT = 'id,order_date,nama,hp,alamat,produk,qty,total,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,cs_nama,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori,status_resi_detail->>bermasalah_since';
 // Kolom untuk marketplace (punya buyer/marketplace/sku/store_name/status, tidak punya nama/hp/alamat/cs_nama)
-const TR_LIST_COLUMNS_MARKETPLACE = 'id,order_date,produk,qty,unit_price,total,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,marketplace,sku,buyer,store_name,status,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori';
+const TR_LIST_COLUMNS_MARKETPLACE = 'id,order_date,produk,qty,unit_price,total,ekspedisi,kota_tujuan,status_resi,status_resi_step,status_resi_updated_at,upload_batch_id,uploaded_by,marketplace,sku,buyer,store_name,status,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori,status_resi_detail->>bermasalah_since';
 
 async function dbGetTrackableOrders(table, filters = {}) {
   const cols = table === 'marketplace_orders' ? TR_LIST_COLUMNS_MARKETPLACE : TR_LIST_COLUMNS_DEFAULT;
@@ -335,7 +335,7 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
     for (let i = 0; i < resiIds.length; i += CHUNK) {
       const chunk = resiIds.slice(i, i + CHUNK);
       const { data } = await _sb.from('akuisisi_orders')
-        .select('id,status_resi,status_resi_step,status_resi_updated_at,ekspedisi,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori')
+        .select('id,status_resi,status_resi_step,status_resi_updated_at,ekspedisi,followup_attempts,followup_responded,followup_courier_notified,status_resi_detail->>masalah_kategori,status_resi_detail->>bermasalah_since')
         .in('id', chunk);
       (data || []).forEach(t => { trackMap[t.id] = t; });
     }
@@ -349,6 +349,7 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
       o.followup_responded     = t.followup_responded     || false;
       o.followup_courier_notified = t.followup_courier_notified || false;
       o.masalah_kategori       = t.masalah_kategori       || null;
+      o.bermasalah_since       = t.bermasalah_since       || null;
       if (t.ekspedisi) o.ekspedisi = t.ekspedisi; // prefer stored (mungkin sudah diedit manual)
     });
 

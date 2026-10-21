@@ -670,6 +670,15 @@ function initTrackingPage(cfg) {
     const checkedLabel = checkedAt
       ? `<div class="tr-checked-at">🕐 Terakhir cek: ${checkedAt}</div>`
       : (stage === 'BELUM_DICEK' ? `<div class="tr-checked-at tr-checked-never">Belum pernah dicek</div>` : '');
+    // Label aging BERMASALAH: "Hari ke-1", "Hari ke-2", dst
+    let agingLabel = '';
+    if (stage === 'BERMASALAH' && o.bermasalah_since) {
+      const diffMs = Date.now() - new Date(o.bermasalah_since).getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      const hari = diffDays + 1; // hari pertama = hari ke-1
+      const agingClass = hari >= 4 ? 'tr-aging-danger' : hari >= 2 ? 'tr-aging-warn' : 'tr-aging-ok';
+      agingLabel = `<span class="tr-aging ${agingClass}">📅 Hari ke-${hari}</span>`;
+    }
 
     return `<div class="tr-card" onclick="trOpenDetail('${o.id}')">
       <div class="tr-card-top">
@@ -680,6 +689,7 @@ function initTrackingPage(cfg) {
             <div class="tr-sub">${escapeHtml(sub)}</div>
             <div class="tr-meta">
               <span class="badge ${meta.badge}">${meta.label}</span>
+              ${agingLabel}
               ${mpBadge}
               ${o.ekspedisi ? `<span class="badge badge-gray">${escapeHtml(o.ekspedisi)}</span>` : ''}
               ${o.cs_nama ? `<span class="badge badge-primary">👤 ${escapeHtml(o.cs_nama)}</span>` : ''}
