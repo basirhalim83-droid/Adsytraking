@@ -254,18 +254,10 @@ function _extractEkspedisiCS(pembayaran, resi) {
 }
 
 async function dbGetAkuisisiOrders(dateFrom, dateTo) {
-  // 0. Fetch SKU map dari CS Input (sumber kebenaran -- sama project dengan all_orderan)
+  // 0. Fetch SKU map dari tracking Supabase (pakai _sb yg sudah authenticated)
   // Dipakai untuk resolve kode SKU di kolom nama ("BUDI|HRB 1") → nama produk bersih.
-  const _skuMap = new Map();
-  try {
-    const skuRes = await fetch(_CS_INPUT_URL + '/rest/v1/sku_produk?select=kode,nama_produk&limit=500', {
-      headers: { apikey: _CS_INPUT_KEY, Authorization: 'Bearer ' + _CS_INPUT_KEY },
-    });
-    if (skuRes.ok) {
-      const skuData = await skuRes.json();
-      (skuData || []).forEach(s => _skuMap.set(String(s.kode).trim().toUpperCase(), s.nama_produk));
-    }
-  } catch (_) { /* fallback ke jumlah field */ }
+  let _skuMap = new Map();
+  try { _skuMap = await dbGetSkuMap(); } catch (_) { /* fallback ke jumlah field */ }
 
   // Resolve produk dari segmen SKU di kolom nama, format: "NAMA PELANGGAN|SKU_BUNDLE|PROMO"
   // SKU bisa bundle: "HRB 1 MAK 1" = 1x Herbanesia + 1x Maksir → pakai pola sama dgn upload-configs.js
