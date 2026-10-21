@@ -675,7 +675,7 @@ function initTrackingPage(cfg) {
     if (stage === 'BERMASALAH' && o.bermasalah_since) {
       const diffMs = Date.now() - new Date(o.bermasalah_since).getTime();
       const diffDays = Math.floor(diffMs / 86400000);
-      const hari = diffDays + 1; // hari pertama = hari ke-1
+      const hari = Math.max(1, diffDays + 1); // minimal hari ke-1
       const agingClass = hari >= 4 ? 'tr-aging-danger' : hari >= 2 ? 'tr-aging-warn' : 'tr-aging-ok';
       agingLabel = `<span class="tr-aging ${agingClass}">📅 Hari ke-${hari}</span>`;
     }
