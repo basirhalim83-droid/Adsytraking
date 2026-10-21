@@ -540,15 +540,10 @@ function initTrackingPage(cfg) {
     const items = AGING_BUCKETS.map(b => {
       const count = agingCounts[b.key] || 0;
       const isActive = st.agingFilter === b.key;
-      return `
-        <div class="tr-sub-card ${isActive ? 'active' : ''}" onclick="trClickAgingSub('${b.key}')">
-          <div class="tr-sub-icon">${b.icon}</div>
-          <div class="tr-sub-count">${count}</div>
-          <div class="tr-sub-label">${b.label}</div>
-        </div>`;
+      return `<div class="tr-tab ${isActive ? 'active' : ''}" onclick="trClickAgingSub('${b.key}')">${b.icon} ${b.label} <span style="font-weight:700">${count}</span></div>`;
     });
 
-    el.innerHTML = `<div class="tr-sub-grid" style="padding:4px 0 8px">${items.join('')}</div>`;
+    el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:6px 0 10px">${items.join('')}</div>`;
   }
 
   window.trSetFilter = (key) => {
