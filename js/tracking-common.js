@@ -287,7 +287,8 @@ function initTrackingPage(cfg) {
     return [...new Set(st.orders.map(o => o.cs_nama).filter(Boolean))].sort();
   }
   function produkOptions() {
-    return [...new Set(st.orders.map(o => o.produk).filter(Boolean))].sort();
+    // Pakai produk pertama sebelum " + " supaya bundle (misal "MISOHWA + MAS") masuk ke opsi "MISOHWA"
+    return [...new Set(st.orders.map(o => (o.produk || '').split(' + ')[0].trim()).filter(Boolean))].sort();
   }
 
   function renderPage() {
@@ -471,7 +472,7 @@ function initTrackingPage(cfg) {
       if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
       if (st.csFilter && o.cs_nama !== st.csFilter) return false;
-      if (st.produkFilter && o.produk !== st.produkFilter) return false;
+      if (st.produkFilter && (o.produk || '').split(' + ')[0].trim() !== st.produkFilter) return false;
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return trEffectiveStage(o) === 'BERMASALAH';
     });
@@ -534,7 +535,7 @@ function initTrackingPage(cfg) {
       if (st.storeFilter && o.store_name !== st.storeFilter) return false;
       if (st.ekspedisiFilter && o.ekspedisi !== st.ekspedisiFilter) return false;
       if (st.csFilter && o.cs_nama !== st.csFilter) return false;
-      if (st.produkFilter && o.produk !== st.produkFilter) return false;
+      if (st.produkFilter && (o.produk || '').split(' + ')[0].trim() !== st.produkFilter) return false;
       if (q && !(String(o.id).toLowerCase().includes(q) || (o.nama||o.buyer||'').toLowerCase().includes(q) || (o.produk||'').toLowerCase().includes(q))) return false;
       return true;
     });

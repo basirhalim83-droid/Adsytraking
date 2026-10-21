@@ -269,6 +269,15 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
     return tokens.map(([, code]) => _skuMap.get(code.toUpperCase()) || code.toUpperCase()).join(' + ');
   }
 
+  // Fallback: bersihkan kolom jumlah kalau SKU tidak ketemu di nama
+  // "4 BOX NEW PRIMAGOLD" → "PRIMAGOLD", "*1 BOTOL NEW HERBAPIL*" → "HERBAPIL"
+  function _cleanJumlah(jumlah) {
+    return String(jumlah || '')
+      .replace(/\*/g, '')
+      .replace(/^\d+\s+(BOTOL|BOX|PCS|BTL)\s+(NEW\s+)?/i, '')
+      .trim();
+  }
+
   // 1. Fetch order data langsung dari CS Input all_orderan (real-time)
   const PAGE = 1000;
   let csOrders = [], offset = 0;
@@ -304,7 +313,7 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
       nama: namaClean,
       hp: r.hp || '',
       alamat: r.alamat || '',
-      produk: produkFromSku || r.jumlah || '',
+      produk: produkFromSku || _cleanJumlah(r.jumlah),
       qty: r.quantity || 1,
       total: r.total_pembayaran || 0,
       ekspedisi: _extractEkspedisiCS(r.pembayaran, resiClean),
