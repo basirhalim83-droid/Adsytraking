@@ -254,20 +254,8 @@ function _extractEkspedisiCS(pembayaran, resi) {
 }
 
 async function dbGetAkuisisiOrders(dateFrom, dateTo) {
-  // 0. Fetch SKU map dari tracking Supabase (pakai _sb yg sudah authenticated)
-  // Dipakai untuk resolve kode SKU di kolom nama ("BUDI|HRB 1") → nama produk bersih.
-  let _skuMap = new Map();
-  try { _skuMap = await dbGetSkuMap(); } catch (_) { /* fallback ke jumlah field */ }
-
-  // Resolve produk dari segmen SKU di kolom nama, format: "NAMA PELANGGAN|SKU_BUNDLE|PROMO"
-  // SKU bisa bundle: "HRB 1 MAK 1" = 1x Herbanesia + 1x Maksir → pakai pola sama dgn upload-configs.js
-  function _csSkuToProduk(rawNama) {
-    const sku = (rawNama || '').split('|')[1]?.trim() || '';
-    if (!sku) return '';
-    const tokens = [...sku.matchAll(/([A-Za-z]+)\s*(\d+)/g)];
-    if (!tokens.length) return '';
-    return tokens.map(([, code]) => _skuMap.get(code.toUpperCase()) || code.toUpperCase()).join(' + ');
-  }
+  // 0. Kick off SKU map fetch di background (jalan paralel dengan all_orderan fetch di bawah)
+  const _skuMapPromise = dbGetSkuMap().catch(() => new Map());
 
   // Fallback: bersihkan kolom jumlah kalau SKU tidak ketemu di nama
   // "4 BOX NEW PRIMAGOLD" → "PRIMAGOLD", "*1 BOTOL NEW HERBAPIL*" → "HERBAPIL"
@@ -279,6 +267,7 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
   }
 
   // 1. Fetch order data langsung dari CS Input all_orderan (real-time)
+  // SKU map jalan paralel di background (_skuMapPromise), akan di-await setelah loop ini selesai
   const PAGE = 1000;
   let csOrders = [], offset = 0;
   while (true) {
@@ -299,6 +288,19 @@ async function dbGetAkuisisiOrders(dateFrom, dateTo) {
     csOrders = csOrders.concat(batch);
     if (batch.length < PAGE) break;
     offset += PAGE;
+  }
+
+  // Tunggu SKU map (sudah jalan paralel, biasanya sudah resolve sebelum loop selesai)
+  const _skuMap = await _skuMapPromise;
+
+  // Resolve produk dari segmen SKU di kolom nama, format: "NAMA PELANGGAN|SKU_BUNDLE|PROMO"
+  // SKU bisa bundle: "HRB 1 MAK 1" = 1x Herbanesia + 1x Maksir
+  function _csSkuToProduk(rawNama) {
+    const sku = (rawNama || '').split('|')[1]?.trim() || '';
+    if (!sku) return '';
+    const tokens = [...sku.matchAll(/([A-Za-z]+)\s*(\d+)/g)];
+    if (!tokens.length) return '';
+    return tokens.map(([, code]) => _skuMap.get(code.toUpperCase()) || code.toUpperCase()).join(' + ');
   }
 
   // 2. Map ke shape yang sama dengan akuisisi_orders
