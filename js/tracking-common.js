@@ -321,7 +321,6 @@ function initTrackingPage(cfg) {
       </div>
       <div id="trSubFilter"></div>
       <div id="trMasalahSubFilter"></div>
-      <div id="trAgingSubFilter"></div>
       <div class="card">
         <div class="card-header">
           <div class="card-header-left"><h3>Tracking Resi ${cfg.domainLabel}</h3><div class="card-sub">Monitor status pengiriman &nbsp;·&nbsp; <span id="trLastUpdated" style="color:var(--text-3);font-size:11px">${st.lastUpdated ? 'diperbarui ' + fmtLastUpdated(st.lastUpdated) : ''}</span></div></div>
@@ -386,6 +385,7 @@ function initTrackingPage(cfg) {
         </div>
         <div class="tr-toolbar">
           <div class="tr-tabs" id="trTabs"></div>
+          <div id="trAgingSubFilter" style="width:100%;flex-basis:100%"></div>
           <div class="tr-search-wrap">
             <input type="text" id="trSearch" class="ctrl-input" style="width:100%" placeholder="🔍 Cari resi / nama / produk..." onkeyup="trSearch()">
           </div>
@@ -548,7 +548,7 @@ function initTrackingPage(cfg) {
         </div>`;
     });
 
-    el.innerHTML = `<div class="tr-sub-grid" style="margin-top:6px">${items.join('')}</div>`;
+    el.innerHTML = `<div class="tr-sub-grid" style="padding:4px 0 8px">${items.join('')}</div>`;
   }
 
   window.trSetFilter = (key) => {
