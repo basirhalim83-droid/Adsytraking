@@ -53,9 +53,9 @@ const OPS_WA_NUMBER = process.env.OPS_WA_NUMBER;
 
 const TABLE_DOMAIN = { akuisisi_orders: 'akuisisi', marketplace_orders: 'marketplace', crm_orders: 'crm' };
 const TABLE_SELECT = {
-  akuisisi_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk,cs_nama',
-  marketplace_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk',
-  crm_orders: 'id,ekspedisi,kota_tujuan,status_resi,produk,cs_nama',
+  akuisisi_orders: 'id,ekspedisi,kota_tujuan,status_resi,status_resi_detail,produk,cs_nama',
+  marketplace_orders: 'id,ekspedisi,kota_tujuan,status_resi,status_resi_detail,produk',
+  crm_orders: 'id,ekspedisi,kota_tujuan,status_resi,status_resi_detail,produk,cs_nama',
 };
 
 function normalizeName(s) {
@@ -134,13 +134,20 @@ module.exports = async function handler(req, res) {
         checked++;
         try {
           const { stage, detail } = await checkResiAuto(row);
+          // Set bermasalah_since saat PERTAMA kali jadi BERMASALAH, preserve kalau sudah ada
+          let detailToSave = detail;
+          if (stage === 'BERMASALAH') {
+            const existingSince = row.status_resi_detail?.bermasalah_since || null;
+            const since = (row.status_resi === 'BERMASALAH' && existingSince) ? existingSince : new Date().toISOString();
+            detailToSave = { ...(detail || {}), bermasalah_since: since };
+          }
           await sbFetch(`${table}?id=eq.${encodeURIComponent(row.id)}`, {
             method: 'PATCH',
             body: JSON.stringify({
               status_resi: stage,
               status_resi_step: STAGE_STEP[stage],
               status_resi_updated_at: new Date().toISOString(),
-              status_resi_detail: detail,
+              status_resi_detail: detailToSave,
             }),
           });
           updated++;
